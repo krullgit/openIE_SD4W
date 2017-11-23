@@ -4,12 +4,8 @@ package com.sksamuel.elastic4s.samples
 import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.search.{SearchHit, SearchResponse}
-import org.elasticsearch.action.support.WriteRequest.RefreshPolicy
 import com.sksamuel.elastic4s.http.ElasticDsl._
-import scala.util.control.Breaks._
 
-import scala.collection.immutable
-import scala.util.control.Exception
 
 
 object HttpClientExampleApp extends App {
@@ -189,7 +185,7 @@ object HttpClientExampleApp extends App {
   }
 
   // Asks for the topic of search and further for the boosts of every keyword
-  def startAndGetBoosts(): (List[String], List[Int]) = {
+  def startAndGetBoosts(): (List[String], List[String], List[String]) = {
     println("+++++++++++++++++++++++++++++\n+++++++++++++++++++++++++++++\nTell me what you wanna crawl the web for?")
     val firstAsk = scala.io.StdIn.readLine("").split(" ").toList
 
@@ -233,57 +229,96 @@ object HttpClientExampleApp extends App {
     getAllBoostTuples(0)
 
     //ask for the boosts
-    println("How important is (0: not important, 1:normal important, 2: more important, 3: very important):")
     val entityListSorted = entityList.result().sortWith((x, y) => x.length() > y.length())
-    val entityListBoosts = List.newBuilder[Int]
+    //TODO: delete boosts
     var entityListTemp = List.newBuilder[String]
+    val exampleListCorrect = List.newBuilder[String]
+    val exampleListIncorrect = List.newBuilder[String]
 
     for (i <- entityListSorted) {
       var entitySplited = i.split(" ")
       if (!entityListTemp.result().mkString(" ").split(" ").contains(entitySplited(0))) {
-        val query = executeSd4w(Query = s"""{\"match_phrase\":{\"nerNorm\":{\"query\":\"$i\"}}}""", SourceInclude = List("nerNorm"), 10);
+        val query = executeSd4w(Query = s"""{\"match_phrase\":{\"nerNorm\":{\"query\":\"$i\"}}}""", SourceInclude = List("nerNorm"), 100);
         val nerTypList = getValueListAndParse(query, "nerNorm")
-        var nerNormList = getValueListAndParse(query, "nerNorm")
+        var nerNormList = getValueListAndParse(query, "nerNorm").map(x => x.toLowerCase).distinct
         val entitySplited = i.split(" ")
         val nerExamples = for (i <- entitySplited) yield {
-          nerNormList.filter(x => x.matches(".*" + i + ".*")).distinct.take(2).mkString(", ")
+          nerNormList.filter(x => x.toLowerCase.matches(".*" + i + ".*")).map(x => x.toLowerCase).distinct.take(2).mkString(", ")
         }
-        var boost = scala.io.StdIn.readLine(s"""$i (e.g.:${nerExamples.distinct.mkString(", ")}): """).toInt
-        if (boost != 0) {
-          entityListBoosts += boost
+        var ifExtractionIsCorrect = scala.io.StdIn.readLine(s"""Is the following extraction correct?(0:no,1:yes): $i (e.g.:${nerExamples.distinct.mkString(", ")}): """).toInt
+        if (ifExtractionIsCorrect != 0) {
           entityListTemp += i
         }
+
+
+        def ifExampleIsCorrect(counter: Int) {
+          if (nerNormList(counter).toLowerCase.matches(".*" + i + ".*")) {
+            var isExampleCorrect = scala.io.StdIn.readLine(s"""Is the following example correct?(0:no,1:yes): ${nerNormList(counter)}:""").toInt
+            if (isExampleCorrect == 1) {
+              exampleListCorrect += nerNormList(counter)
+            } else {
+              exampleListIncorrect += nerNormList(counter)
+            }
+            if ((exampleListCorrect.result().size + exampleListIncorrect.result().size) % 4 == 0) {
+              if (scala.io.StdIn.readLine("Continue?(0:no,1:yes)").equals("1")) {
+                if (counter < nerNormList.size) {
+                  ifExampleIsCorrect(counter + 1)
+                }
+
+              }
+            } else {
+              if (counter < nerNormList.size - 1) {
+                ifExampleIsCorrect(counter + 1)
+              }
+            }
+          } else {
+            if (counter < nerNormList.size - 1) {
+              ifExampleIsCorrect(counter + 1)
+            }
+          }
+        }
+
+        ifExampleIsCorrect(0)
+
       }
     }
-    (entityListTemp.result(), entityListBoosts.result())
+    println(exampleListCorrect.result())
+    println(exampleListIncorrect.result())
+    (entityListTemp.result(), exampleListCorrect.result(), exampleListIncorrect.result())
   }
 
   // performs a bool query
-  def queryBoolShould(entityList: List[String], entityBoosts: List[Int]): String = {
-    val entityBoostsNormalized = entityBoosts.map(x => {
-      if (x == 0) {
-        0
-      } else if (x == 1) {
-        0.1
-      } else if (x == 2) {
-        0.2
-      } else if (x == 3) {
-        0.3
+  def queryBoolShould(entityList: List[String], entityBoosts: List[Int] = List()): String = {
+    if (!entityBoosts.isEmpty) {
+      val entityBoostsNormalized = entityBoosts.map(x => {
+        if (x == 0) {
+          0
+        } else if (x == 1) {
+          0.1
+        } else if (x == 2) {
+          0.2
+        } else if (x == 3) {
+          0.3
+        }
+      })
+      val queryInner = for (i <- entityList.indices) yield {
+        s"""{"match_phrase": {"nerNorm":  { "boost" : ${entityBoosts(i)},"query" : "${entityList(i)}"}}},"""
       }
-    })
-    val queryInner = for (i <- entityList.indices) yield {
+      val queryInner2 = for (i <- entityList.indices) yield {
+        if (entityBoosts(i) == 3) {
+          s"""{"match_phrase": {"nerNorm":  { "query" : "${entityList(i)}"}}},"""
+        }
+      }
+      if (!queryInner2.filter(x => x.equals("()")).isEmpty) {
+        s"""{\"bool\": {\"should\": [${queryInner.mkString("").dropRight(1)}],\"must\": [${queryInner2.mkString("").dropRight(1)}]}}"""
+      } else {
+        s"""{\"bool\": {\"should\": [${queryInner.mkString("").dropRight(1)}]}}"""
+      }
+    } else {
+      val queryInner = for (i <- entityList.indices) yield {
 
-      s"""{"match_phrase": {"nerNorm":  { "boost" : ${entityBoosts(i)},"query" : "${entityList(i)}"}}},"""
-
-    }
-    val queryInner2 = for (i <- entityList.indices) yield {
-      if (entityBoosts(i) == 3) {
         s"""{"match_phrase": {"nerNorm":  { "query" : "${entityList(i)}"}}},"""
       }
-    }
-    if (!queryInner2.filter(x => x.equals("()")).isEmpty) {
-      s"""{\"bool\": {\"should\": [${queryInner.mkString("").dropRight(1)}],\"must\": [${queryInner2.mkString("").dropRight(1)}]}}"""
-    } else {
       s"""{\"bool\": {\"should\": [${queryInner.mkString("").dropRight(1)}]}}"""
     }
   }
@@ -292,8 +327,8 @@ object HttpClientExampleApp extends App {
 
   val client = HttpClient(ElasticsearchClientUri("localhost", 9200)) // new client
   while (true) {
-    val (entityList1: List[String], entityBoosts1: List[Int]) = startAndGetBoosts
-    val response1 = executeSd4w(queryBoolShould(entityList1, entityBoosts1), List("title.string", "text.string"), 3)
+    val (entityList1: List[String], exampleListCorrect1: List[String], exampleListIncorrect1: List[String]) = startAndGetBoosts
+    val response1 = executeSd4w(queryBoolShould(entityList1), List("title.string", "text.string"), 3)
     getValueList(response1, "text.string").foreach(x => {
       println(x);
       println("#############################")
