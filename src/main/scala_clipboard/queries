@@ -1,0 +1,3 @@
+{"match_phrase": {"nerNorm":  { "boost" : 3,"query" : "Andreas"}}{
+
+{"regexp":{"nerNorm.keyword":".*food.*[^~].*new.*"}}

@@ -1,6 +1,6 @@
 import com.sksamuel.elastic4s.http.ElasticDsl.{bulk, get, indexInto, search}
 import com.sksamuel.elastic4s.http.search.{SearchHit, SearchResponse}
-import com.sksamuel.elastic4s.samples.HttpClientExampleApp.{client, flatten, getFieldHelp}
+import com.sksamuel.elastic4s.samples.HttpClientExampleApp.{client, flatten}
 import org.elasticsearch.action.support.WriteRequest.RefreshPolicy
 
 
@@ -158,3 +158,9 @@ def getField(response: List[Any], path: List[String], sourceField: String): List
     println("")
   }
 }*/
+/*
+val sentencePartWithoutStopWordsQuery = for (i <- sentencePartWithoutStopWords.split(" ").indices ) yield {
+  sentencePartWithoutStopWords.split(" ")(i)+"[^~]+"
+}
+val query = executeSd4w(Query = s"""{"regexp":{"nerNorm.keyword":".*${sentencePartWithoutStopWordsQuery.mkString("").dropRight(5)}.*"}}""", SourceInclude = List("nerNorm"), 1);
+*/

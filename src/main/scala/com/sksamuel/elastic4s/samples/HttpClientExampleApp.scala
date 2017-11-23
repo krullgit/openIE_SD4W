@@ -6,6 +6,7 @@ import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.search.{SearchHit, SearchResponse}
 import org.elasticsearch.action.support.WriteRequest.RefreshPolicy
 import com.sksamuel.elastic4s.http.ElasticDsl._
+import scala.util.control.Breaks._
 
 import scala.collection.immutable
 import scala.util.control.Exception
@@ -70,6 +71,13 @@ object HttpClientExampleApp extends App {
     temp.flatten.toList //.filter(i => !i.equals("")).distinct
   }
 
+  def getValueListAndParse(response: List[SearchHit], path: String): List[String] = {
+    val temp = for (j <- response.indices) yield {
+      response(j).sourceField(path).toString.split(" ~ ").toList
+    }
+    temp.flatten.toList //.filter(i => !i.equals("")).distinct
+  }
+
   // returns a list of values from the response
   def getField(searchhit: SearchHit, path: String): List[String] = {
     val pathSplit:List[String] = path.split("\\.").toList
@@ -105,14 +113,15 @@ object HttpClientExampleApp extends App {
   }
 
   // performs a http query to elastic
-  def execute(Query: String = "{}", SourceInclude: List[String]) = {
+  def execute(Query: String = "{\"match_all\": {}}", SourceInclude: List[String]) = {
     client.execute { // get all conceptMentions (which has the relationMentions)
       search("rss" / "rss3").rawQuery(Query) sourceInclude SourceInclude size 1000 //.*Hamburg.*Berlin.*
     }.await.hits.hits.toList
   }
-  def executeSd4w(Query: String = "{}", SourceInclude: List[String]) = {
+
+  def executeSd4w(Query: String = "{\"match_all\": {}}", SourceInclude: List[String] = List(""), size: Int = 10) = {
     client.execute { // get all conceptMentions (which has the relationMentions)
-      search("sd4w" / "news_english").rawQuery(Query) sourceInclude SourceInclude size 1000 //.*Hamburg.*Berlin.*
+      search("test" / "doc").rawQuery(Query) /*sourceInclude SourceInclude*/ size size //.*Hamburg.*Berlin.*
     }.await.hits.hits.toList
   }
 
@@ -179,20 +188,143 @@ object HttpClientExampleApp extends App {
     }
   }
 
+  // Asks for the topic of search and further for the boosts of every keyword
+  def startAndGetBoosts(): (List[String], List[Int]) = {
+    println("+++++++++++++++++++++++++++++\n+++++++++++++++++++++++++++++\nTell me what you wanna crawl the web for?")
+    val firstAsk = scala.io.StdIn.readLine("").split(" ").toList
+
+    val entityList = List.newBuilder[String]
+
+    def getAllBoostTuples(countUp: Int) {
+      def getBoostTuple(countDown: Int) {
+        var sentencePart = firstAsk(countUp)
+        for (i <- 1 to countDown) {
+          if (firstAsk.size > (countUp + i)) {
+            sentencePart += " " + firstAsk(countUp + i)
+          }
+        }
+        sentencePart = sentencePart.replaceAll("\\.", "")
+        val stopWords: List[String] = "I'm tell looking want know #hereTheOriginalListStarts# a about above across after afterwards again against all almost alone along already also although always am among amongst amoungst amount an and another any anyhow anyone anything anyway anywhere are around as at back be became because become becomes becoming been before beforehand behind being below beside besides between beyond bill both bottom but by call can cannot cant co computer con could couldnt cry de describe detail do done down due during each eg eight either eleven else elsewhere empty enough etc even ever every everyone everything everywhere except few fifteen fify fill find fire first five for former formerly forty found four from front full further get give go had has hasnt have he hence her here hereafter hereby herein hereupon hers herse\" him himse\" his how however hundred i ie if in inc indeed interest into is it its itse\" keep last latter latterly least less ltd made many may me meanwhile might mill mine more moreover most mostly move much must my myse\" name namely neither never nevertheless next nine no nobody none noone nor not nothing now nowhere of off often on once one only onto or other others otherwise our ours ourselves out over own part per perhaps please put rather re same see seem seemed seeming seems serious several she should show side since sincere six sixty so some somehow someone something sometime sometimes somewhere still such system take ten than that the their them themselves then thence there thereafter thereby therefore therein thereupon these they thick thin third this those though three through throughout thru thus to together too top toward towards twelve twenty two un under until up upon us very via was we well were what whatever when whence whenever where whereafter whereas whereby wherein whereupon wherever whether which while whither who whoever whole whom whose why will with within without would yet you your yours yourself yourselves".split(" ").toList
+        val sentencePartWithoutStopWords: String = sentencePart.split(" ").toList.filter(x => !stopWords.contains(x.toLowerCase)).mkString(" ")
+        if (sentencePartWithoutStopWords.isEmpty) return
+
+
+        val query = executeSd4w(Query = s"""{\"match_phrase\":{\"nerNorm\":{\"query\":\"$sentencePartWithoutStopWords\"}}}""", SourceInclude = List("nerNorm"), 1);
+        if (!query.isEmpty) {
+          entityList += sentencePartWithoutStopWords
+
+          if (countDown - 1 >= 0) getBoostTuple(countDown - 1) else return
+        }
+      }
+
+      getBoostTuple(2)
+      if (entityList.result().size > 0) {
+        val indexOfFirstWordInBoostTuple = firstAsk.indexOf(entityList.result().last.split(" ").toList(0))
+        if (indexOfFirstWordInBoostTuple > countUp) {
+          if (countUp + 1 < firstAsk.size) getAllBoostTuples(indexOfFirstWordInBoostTuple) else return
+        } else {
+          if (countUp + 1 < firstAsk.size) getAllBoostTuples(countUp + 1) else return
+        }
+      } else {
+        if (countUp + 1 < firstAsk.size) getAllBoostTuples(countUp + 1) else return
+      }
+    }
+
+    getAllBoostTuples(0)
+
+    //ask for the boosts
+    println("How important is (0: not important, 1:normal important, 2: more important, 3: very important):")
+    val entityListSorted = entityList.result().sortWith((x, y) => x.length() > y.length())
+    val entityListBoosts = List.newBuilder[Int]
+    var entityListTemp = List.newBuilder[String]
+
+    for (i <- entityListSorted) {
+      var entitySplited = i.split(" ")
+      if (!entityListTemp.result().mkString(" ").split(" ").contains(entitySplited(0))) {
+        val query = executeSd4w(Query = s"""{\"match_phrase\":{\"nerNorm\":{\"query\":\"$i\"}}}""", SourceInclude = List("nerNorm"), 10);
+        val nerTypList = getValueListAndParse(query, "nerNorm")
+        var nerNormList = getValueListAndParse(query, "nerNorm")
+        val entitySplited = i.split(" ")
+        val nerExamples = for (i <- entitySplited) yield {
+          nerNormList.filter(x => x.matches(".*" + i + ".*")).distinct.take(2).mkString(", ")
+        }
+        var boost = scala.io.StdIn.readLine(s"""$i (e.g.:${nerExamples.distinct.mkString(", ")}): """).toInt
+        if (boost != 0) {
+          entityListBoosts += boost
+          entityListTemp += i
+        }
+      }
+    }
+    (entityListTemp.result(), entityListBoosts.result())
+  }
+
+  // performs a bool query
+  def queryBoolShould(entityList: List[String], entityBoosts: List[Int]): String = {
+    val entityBoostsNormalized = entityBoosts.map(x => {
+      if (x == 0) {
+        0
+      } else if (x == 1) {
+        0.1
+      } else if (x == 2) {
+        0.2
+      } else if (x == 3) {
+        0.3
+      }
+    })
+    val queryInner = for (i <- entityList.indices) yield {
+
+      s"""{"match_phrase": {"nerNorm":  { "boost" : ${entityBoosts(i)},"query" : "${entityList(i)}"}}},"""
+
+    }
+    val queryInner2 = for (i <- entityList.indices) yield {
+      if (entityBoosts(i) == 3) {
+        s"""{"match_phrase": {"nerNorm":  { "query" : "${entityList(i)}"}}},"""
+      }
+    }
+    if (!queryInner2.filter(x => x.equals("()")).isEmpty) {
+      s"""{\"bool\": {\"should\": [${queryInner.mkString("").dropRight(1)}],\"must\": [${queryInner2.mkString("").dropRight(1)}]}}"""
+    } else {
+      s"""{\"bool\": {\"should\": [${queryInner.mkString("").dropRight(1)}]}}"""
+    }
+  }
   // MAIN
+  // nerNorm # nerTyp # posLemmas # post
+
   val client = HttpClient(ElasticsearchClientUri("localhost", 9200)) // new client
+  while (true) {
+    val (entityList1: List[String], entityBoosts1: List[Int]) = startAndGetBoosts
+    val response1 = executeSd4w(queryBoolShould(entityList1, entityBoosts1), List("title.string", "text.string"), 3)
+    getValueList(response1, "text.string").foreach(x => {
+      println(x);
+      println("#############################")
+    })
+  }
 
-  val concSourceInclude = List("conceptMentions.array.type","conceptMentions.array.normalizedValue.string")
-  val concResp = executeSd4w(SourceInclude = concSourceInclude) // get all conceptMentions (which has the relationMentions)
-  var concList = getValueList(concResp, "conceptMentions.array.type") // get all relationMentions
+  // get first results
 
-  val chosenRel: List[String] = chooseSomething(concList, "conceptMentions") // choose some relationMentions
 
-  val iteration1TypeList = getValueListofLists(concResp, "conceptMentions.array.type")
-  val iteration1ValueList = getValueListofLists(concResp, "conceptMentions.array.normalizedValue.string")
+  /*
+  val query1 = executeSd4w() // get all conceptMentions (which has the relationMentions)
 
-  printConceptsAndValues(iteration1TypeList,iteration1ValueList,chosenRel)
+  var nerTypList = getValueListAndParse(query1, "nerTyp")
+  val chosennerTypList: List[String] = chooseSomething(nerTypList, "nerTyp")
 
+  var nerNormList = getValueListAndParse(query1, "nerNorm")
+  val choseNerNormListMust: List[String] = chooseSomething(nerNormList, "nerNorm must")
+  val choseNerNormListShould: List[String] = chooseSomething(nerNormList, "nerNorm should")
+  */
+
+  /*
+  var posList = getValueListAndParse(query1, "pos")
+  val chosenposList: List[String] = chooseSomething(posList, "pos")
+  var posLemmasList = getValueListAndParse(query1, "posLemmas")
+  val chosenposLemmas: List[String] = chooseSomething(posLemmasList, "posLemmas")*/
+  /*
+    val iteration1TypeList = getValueListofLists(concResp, "conceptMentions.array.type")
+    val iteration1ValueList = getValueListofLists(concResp, "conceptMentions.array.normalizedValue.string")
+
+    printConceptsAndValues(iteration1TypeList,iteration1ValueList,chosenRel)
+  */
   // stuff for rss hand annotated
   /*
   val relSourceInclude = List("relationMentions.array.name")
