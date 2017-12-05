@@ -164,3 +164,27 @@ val sentencePartWithoutStopWordsQuery = for (i <- sentencePartWithoutStopWords.s
 }
 val query = executeSd4w(Query = s"""{"regexp":{"nerNorm.keyword":".*${sentencePartWithoutStopWordsQuery.mkString("").dropRight(5)}.*"}}""", SourceInclude = List("nerNorm"), 1);
 */
+
+/*
+package com.sksamuel.elastic4s.samples
+
+import java.io.PrintWriter
+
+import com.sksamuel.elastic4s.ElasticsearchClientUri
+import com.sksamuel.elastic4s.http.HttpClient
+import HttpClientExampleApp._
+
+object analogyExtraction {
+
+  def main(args: Array[String]) {
+
+    val client = HttpClient(ElasticsearchClientUri("localhost", 9200)) // new client
+    val response:List[String] =  getValueListAndParse(executeSd4w(SourceInclude = List("posLemmas"), size = 10),"posLemmas").distinct
+
+    new PrintWriter("allTokens.txt") {
+      response.foreach(x => write(x+"\n"))
+    }
+  }
+}
+
+ */
