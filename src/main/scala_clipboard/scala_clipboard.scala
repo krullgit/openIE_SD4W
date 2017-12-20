@@ -188,3 +188,48 @@ object analogyExtraction {
 }
 
  */
+
+/*var hashMapAllWords = scala.collection.mutable.Map[Int, String]()
+    var counterForHashMapKeys: Int = 0
+
+    coOccurrences.keys.foreach(word => {
+      if (!hashMapAllWords.values.toList.contains(word)) {
+        hashMapAllWords(counterForHashMapKeys) = word
+        counterForHashMapKeys += 1
+      }
+    })
+
+    coOccurrences.values.foreach(map => {
+      map.keys.toList.foreach(word => {
+        if (!hashMapAllWords.values.toList.contains(word)) {
+          hashMapAllWords(counterForHashMapKeys) = word
+          counterForHashMapKeys += 1
+        }
+      })
+    })
+
+    var swappedhashMapAllWords: scala.collection.mutable.Map[String, Int] = hashMapAllWords.map(_.swap)
+
+    var hashedCoOccurrences: ListMap[Int, mutable.Map[Int, Int]] = coOccurrences
+      .map(map => {
+        (swappedhashMapAllWords(map._1), map._2)
+      })
+      .map(map => {
+        (map._1, map._2.map(mapInner => (swappedhashMapAllWords(mapInner._1), mapInner._2)))
+      })*/
+
+/*var CosOfAngleMatrix: scala.collection.mutable.Map[String, scala.collection.mutable.Map[String, Double]] = hashedCosOfAngleMatrix
+   .map(map => (hashMapAllWords(map._1), map._2))
+   .map(map => (map._1, map._2.map(mapInner => (hashMapAllWords(mapInner._1), mapInner._2))))
+ */
+
+/*val cosOfAngleMatrixOrdered: mutable.Map[String, ListMap[String, Double]] = CosOfAngleMatrix.map(x => {
+  val orderedMap = ListMap(x._2.toList.sortBy {
+    _._2
+  }: _*)
+  (x._1 -> orderedMap)
+})*/
+/*new PrintWriter("cosOfAngleMatrix.txt") { // open new file
+  cosOfAngleMatrixOrdered.foreach(x => write(x + "\n"))
+  close // close file
+}*/

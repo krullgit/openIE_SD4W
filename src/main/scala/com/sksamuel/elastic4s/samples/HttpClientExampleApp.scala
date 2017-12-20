@@ -366,6 +366,7 @@ object HttpClientExampleApp extends App {
     })
   }
 
+
   // get first results
 
 
