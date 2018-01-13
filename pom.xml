@@ -70,6 +70,12 @@
             <classifier>models</classifier>
         </dependency>
 
+        <dependency>
+            <groupId>com.sksamuel.avro4s</groupId>
+            <artifactId>avro4s-core_2.12</artifactId>
+            <version>1.8.0</version>
+        </dependency>
+
 
     </dependencies>
 

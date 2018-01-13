@@ -14,7 +14,6 @@
     <orderEntry type="library" name="Maven: org.scala-lang:scala-library:2.12.4" level="project" />
     <orderEntry type="library" name="Maven: com.sksamuel.elastic4s:elastic4s-core_2.12:6.1.1" level="project" />
     <orderEntry type="library" name="Maven: com.sksamuel.exts:exts_2.12:1.60.0" level="project" />
-    <orderEntry type="library" name="Maven: org.scala-lang:scala-reflect:2.12.2" level="project" />
     <orderEntry type="library" name="Maven: com.typesafe:config:1.3.0" level="project" />
     <orderEntry type="library" name="Maven: org.typelevel:cats-core_2.12:1.0.0-RC2" level="project" />
     <orderEntry type="library" name="Maven: org.typelevel:cats-macros_2.12:1.0.0-RC2" level="project" />
@@ -33,7 +32,6 @@
     <orderEntry type="library" name="Maven: com.fasterxml.jackson.core:jackson-annotations:2.9.0" level="project" />
     <orderEntry type="library" name="Maven: com.fasterxml.jackson.module:jackson-module-scala_2.12:2.9.2" level="project" />
     <orderEntry type="library" name="Maven: com.fasterxml.jackson.module:jackson-module-paranamer:2.9.2" level="project" />
-    <orderEntry type="library" name="Maven: com.thoughtworks.paranamer:paranamer:2.8" level="project" />
     <orderEntry type="library" name="Maven: edu.stanford.nlp:stanford-corenlp:3.7.0" level="project" />
     <orderEntry type="library" name="Maven: com.apple:AppleJavaExtensions:1.4" level="project" />
     <orderEntry type="library" name="Maven: de.jollyday:jollyday:0.4.9" level="project" />
@@ -54,5 +52,17 @@
     <orderEntry type="library" name="Maven: org.glassfish:javax.json:1.0.4" level="project" />
     <orderEntry type="library" name="Maven: com.google.protobuf:protobuf-java:2.6.1" level="project" />
     <orderEntry type="library" name="Maven: edu.stanford.nlp:stanford-corenlp:models:3.7.0" level="project" />
+    <orderEntry type="library" name="Maven: com.sksamuel.avro4s:avro4s-core_2.12:1.8.0" level="project" />
+    <orderEntry type="library" name="Maven: com.sksamuel.avro4s:avro4s-macros_2.12:1.8.0" level="project" />
+    <orderEntry type="library" name="Maven: com.chuusai:shapeless_2.12:2.3.2" level="project" />
+    <orderEntry type="library" name="Maven: org.typelevel:macro-compat_2.12:1.1.1" level="project" />
+    <orderEntry type="library" name="Maven: org.scala-lang:scala-reflect:2.12.1" level="project" />
+    <orderEntry type="library" name="Maven: org.apache.avro:avro:1.8.1" level="project" />
+    <orderEntry type="library" name="Maven: org.codehaus.jackson:jackson-core-asl:1.9.13" level="project" />
+    <orderEntry type="library" name="Maven: org.codehaus.jackson:jackson-mapper-asl:1.9.13" level="project" />
+    <orderEntry type="library" name="Maven: com.thoughtworks.paranamer:paranamer:2.7" level="project" />
+    <orderEntry type="library" name="Maven: org.xerial.snappy:snappy-java:1.1.1.3" level="project" />
+    <orderEntry type="library" name="Maven: org.apache.commons:commons-compress:1.8.1" level="project" />
+    <orderEntry type="library" name="Maven: org.tukaani:xz:1.5" level="project" />
   </component>
 </module>

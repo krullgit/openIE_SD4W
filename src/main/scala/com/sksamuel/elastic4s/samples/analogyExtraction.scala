@@ -19,6 +19,9 @@ import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
 import edu.stanford.nlp.util.CoreMap
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
+import com.sksamuel.avro4s.AvroSchema
+import java.io.File
+import com.sksamuel.avro4s.AvroOutputStream
 
 object analogyExtraction {
 
@@ -251,14 +254,28 @@ object analogyExtraction {
     }
 
 
-    val cleanedOrderedCoOccurrences2 = cleanedOrderedCoOccurrences.filter(x => {
+    val cleanedOrderedCoOccurrences2: ListMap[String, Map[String, Int]] = cleanedOrderedCoOccurrences.filter(x => {
       getPOS(x._1) == "JJ" || getPOS(x._1) == "JJR" || getPOS(x._1) == "JJS" || getPOS(x._1) == "NN" || getPOS(x._1) == "NNS" || getPOS(x._1) == "NNP" || getPOS(x._1) == "NNPS" || getPOS(x._1) == "PDT" || getPOS(x._1) == "RB" || getPOS(x._1) == "RBR" || getPOS(x._1) == "RBS" || getPOS(x._1) == "RP" || getPOS(x._1) == "VB" || getPOS(x._1) == "VBD" || getPOS(x._1) == "VBG" || getPOS(x._1) == "VBN" || getPOS(x._1) == "VBP" || getPOS(x._1) == "VBZ" || getPOS(x._1) == "VBG" || getPOS(x._1) == "VBG"
-    })
+    }).map(x => (x._1, x._2.toMap))
     println("size(cleanedOrderedCoOccurrences2): " + cleanedOrderedCoOccurrences2.size)
     new PrintWriter("coOccurrences.txt") { // open new file
       cleanedOrderedCoOccurrences2.foreach(x => write(x + "\n"))
       close // close file
     }
+    /*
+    //case class coocMap(map: Map[String, Int])
+    case class wordList(word: String, cooc: Map[String,Int])
+    val schema = AvroSchema[wordList]
+    val os = AvroOutputStream.data[wordList](new File("coOccurrences.avro"))
+
+    cleanedOrderedCoOccurrences2.toMap.foreach(x => {
+      //val coocMap = List.newBuilder[coocMap]
+      //val pepperoni = wordList(x._1, x._2)
+      os.write(Seq(wordList(x._1, x._2)))
+    })
+    os.flush()
+    os.close()
+    */
 
     println("ready with CoOccurrences")
     allDistances(cleanedOrderedCoOccurrences2)
@@ -268,7 +285,7 @@ object analogyExtraction {
   // get co-occurrences (get the cos between the wordvectors)
   ////////////////////
 
-  def allDistances(coOccurrences: ListMap[String, mutable.Map[String, Int]]) {
+  def allDistances(coOccurrences: ListMap[String, Map[String, Int]]) {
 
     val borderForCosAngle: Double = 0.0
 
