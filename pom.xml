@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>com.sksamuel.elastic4s</groupId>
+    <groupId>de.tu_berlin.dima</groupId>
     <artifactId>elastic4s-http-client-maven</artifactId>
     <packaging>pom</packaging>
     <version>1.0.1</version>
@@ -9,20 +9,14 @@
     <properties>
         <scalaVersion>2.12.2</scalaVersion>
         <elastic4sVersion>5.5.4</elastic4sVersion>
+        <corenlp.version>3.7.0</corenlp.version>
+        <guava.version>21.0-rc2</guava.version>
     </properties>
 
     <dependencies>
-        <dependency>
-            <groupId>org.scala-lang</groupId>
-            <artifactId>scala-library</artifactId>
-            <version>${scalaVersion}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.sksamuel.elastic4s</groupId>
-            <artifactId>elastic4s-http_2.12</artifactId>
-            <version>${elastic4sVersion}</version>
-        </dependency>
-        <dependency>
+
+
+        <!--<dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>1.7.5</version>
@@ -51,7 +45,32 @@
             <groupId>com.typesafe.play</groupId>
             <artifactId>play-json_2.12</artifactId>
             <version>2.6.7</version>
+        </dependency>-->
+
+
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.sksamuel.elastic4s</groupId>
+            <artifactId>elastic4s-http_2.12</artifactId>
+            <version>6.1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>edu.stanford.nlp</groupId>
+            <artifactId>stanford-corenlp</artifactId>
+            <version>${corenlp.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>edu.stanford.nlp</groupId>
+            <artifactId>stanford-corenlp</artifactId>
+            <version>${corenlp.version}</version>
+            <classifier>models</classifier>
+        </dependency>
+
+
     </dependencies>
 
     <build>

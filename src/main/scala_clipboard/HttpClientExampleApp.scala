@@ -9,9 +9,6 @@ import com.sksamuel.elastic4s.http.ElasticDsl._
 
 
 object HttpClientExampleApp extends App {
-  def test() {
-    println("test")
-  }
   // METHODS
 
   // just prints the text field from the results
@@ -87,7 +84,7 @@ object HttpClientExampleApp extends App {
     }
     val listBuilder = List.newBuilder[String]
     val y: Any = searchhit.sourceField(sourceField)
-
+    println(y)
     downThePath(1, y)
 
     def downThePath(count: Int, innerElement: Any) {
@@ -216,7 +213,7 @@ object HttpClientExampleApp extends App {
   }
 
   // Asks for the topic of search and further for the boosts of every keyword
-  def startAndGetBoosts(): (List[String], List[String], List[String]) = {
+  def start(): (List[String], List[String], List[String]) = {
     println("+++++++++++++++++++++++++++++\n+++++++++++++++++++++++++++++\nTell me what you wanna crawl the web for?")
     val firstAsk = scala.io.StdIn.readLine("").split(" ").toList
 
@@ -358,7 +355,7 @@ object HttpClientExampleApp extends App {
 
   val client = HttpClient(ElasticsearchClientUri("localhost", 9200)) // new client
   while (true) {
-    val (entityList1: List[String], exampleListCorrect1: List[String], exampleListIncorrect1: List[String]) = startAndGetBoosts
+    val (entityList1: List[String], exampleListCorrect1: List[String], exampleListIncorrect1: List[String]) = start
     val response1 = executeSd4w(client, queryBoolShould(entityList1), List("title.string", "text.string"), 3)
     getValueList(response1, "text.string").foreach(x => {
       println(x);
