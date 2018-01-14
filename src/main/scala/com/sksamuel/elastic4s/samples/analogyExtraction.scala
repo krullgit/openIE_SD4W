@@ -262,7 +262,7 @@ object analogyExtraction {
       cleanedOrderedCoOccurrences2.foreach(x => write(x + "\n"))
       close // close file
     }
-    /*
+
     //case class coocMap(map: Map[String, Int])
     case class wordList(word: String, cooc: Map[String,Int])
     val schema = AvroSchema[wordList]
@@ -275,7 +275,7 @@ object analogyExtraction {
     })
     os.flush()
     os.close()
-    */
+
 
     println("ready with CoOccurrences")
     allDistances(cleanedOrderedCoOccurrences2)

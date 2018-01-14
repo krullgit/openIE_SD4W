@@ -56,7 +56,8 @@
         <dependency>
             <groupId>com.sksamuel.elastic4s</groupId>
             <artifactId>elastic4s-http_2.12</artifactId>
-            <version>6.1.1</version>
+            <version>6.1.2</version>
+
         </dependency>
         <dependency>
             <groupId>edu.stanford.nlp</groupId>
@@ -70,10 +71,25 @@
             <classifier>models</classifier>
         </dependency>
 
+
         <dependency>
             <groupId>com.sksamuel.avro4s</groupId>
             <artifactId>avro4s-core_2.12</artifactId>
             <version>1.8.0</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>slf4j-api</artifactId>
+                    <groupId>org.slf4j</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>scala-library</artifactId>
+                    <groupId>org.scala-lang</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>paranamer</artifactId>
+                    <groupId>com.thoughtworks.paranamer</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
 
