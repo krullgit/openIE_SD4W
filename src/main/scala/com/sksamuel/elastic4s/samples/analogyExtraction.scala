@@ -1,27 +1,24 @@
 
 package com.sksamuel.elastic4s.samples
 
-import java.io.PrintWriter
+import java.io.{File, IOException, PrintWriter}
 import java.util.Properties
 
 import com.sksamuel.elastic4s.ElasticsearchClientUri
+import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.search.SearchIterator
-import com.sksamuel.elastic4s.http.ElasticDsl._
-
-import scala.collection.immutable.ListMap
-import scala.collection.mutable
-import scala.concurrent.duration._
-import scala.collection.mutable.Queue
 import edu.stanford.nlp.ling.CoreAnnotations.{PartOfSpeechAnnotation, SentencesAnnotation, TokensAnnotation}
 import edu.stanford.nlp.ling.CoreLabel
 import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
 import edu.stanford.nlp.util.CoreMap
+import org.apache.avro.file.DataFileReader
+import org.apache.avro.specific.SpecificDatumReader
+
 import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
-import com.sksamuel.avro4s.AvroSchema
-import java.io.File
-import com.sksamuel.avro4s.AvroOutputStream
+import scala.collection.mutable
+import scala.concurrent.duration._
 
 object analogyExtraction {
 
@@ -157,8 +154,10 @@ object analogyExtraction {
     val atleastCooccurence = 50
 
     var coOccurrences = scala.collection.mutable.Map[String, scala.collection.mutable.Map[String, Int]]()
-    //val iterator = SearchIterator.hits(client, search("test" / "doc").matchAllQuery.keepAlive(keepAlive = "10m").size(100).sourceInclude(List("nerNorm", "nerTyp", "posLemmas"))) // returns 50 values and blocks until the iterator gets to the last element
-    val iterator = SearchIterator.hits(client, search("test") query matchQuery("nerNorm", "wellness") keepAlive (keepAlive = "10m") size (100) sourceInclude (List("nerNorm", "nerTyp", "posLemmas"))) // returns 50 values and blocks until the iterator gets to the last element
+    val iterator = SearchIterator.hits(client, search("test" / "doc").matchAllQuery.keepAlive(keepAlive = "10m").size(100).sourceInclude(List("nerNorm", "nerTyp", "posLemmas"))) // returns 50 values and blocks until the iterator gets to the last element
+
+    // use this for a small test set (approx 200)
+    //val iterator = SearchIterator.hits(client, search("test") query matchQuery("nerNorm", "wellness") keepAlive (keepAlive = "10m") size (100) sourceInclude (List("nerNorm", "nerTyp", "posLemmas"))) // returns 50 values and blocks until the iterator gets to the last element
     var counter: Int = 0
     var countWords = 0
     iterator.foreach(searchhit => { // for each element in the iterator
@@ -262,7 +261,7 @@ object analogyExtraction {
       cleanedOrderedCoOccurrences2.foreach(x => write(x + "\n"))
       close // close file
     }
-
+    /*
     //case class coocMap(map: Map[String, Int])
     case class wordList(word: String, cooc: Map[String,Int])
     val schema = AvroSchema[wordList]
@@ -275,20 +274,60 @@ object analogyExtraction {
     })
     os.flush()
     os.close()
-
+    */
 
     println("ready with CoOccurrences")
-    allDistances(cleanedOrderedCoOccurrences2)
+    //allDistances(cleanedOrderedCoOccurrences2)
   }
 
   ////////////////////
   // get co-occurrences (get the cos between the wordvectors)
   ////////////////////
 
-  def allDistances(coOccurrences: ListMap[String, Map[String, Int]]) {
+  def allDistances(/*coOccurrences: ListMap[String, Map[String, Int]]*/) {
 
     val borderForCosAngle: Double = 0.0
 
+    //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    //  deserialize avro file
+    //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+    val coOccurrencesBuilder = ListMap.newBuilder[String, Map[String, Int]]
+    val avroOutput: File = new File("coOccurrences.avro")
+    try {
+      val bdPersonDatumReader = new SpecificDatumReader[wordList](classOf[wordList])
+      val dataFileReader = new DataFileReader[wordList](avroOutput, bdPersonDatumReader)
+      while ( {
+        dataFileReader.hasNext
+      }) {
+        import scala.collection.JavaConversions._
+        val currentWord = dataFileReader.next
+        coOccurrencesBuilder += Tuple2(currentWord.getWord.toString, currentWord.getCooc.toMap.map(x => (x._1.toString, x._2.toInt)))
+      }
+    } catch {
+      case e: IOException =>
+        System.out.println("Error reading Avro")
+    }
+    val coOccurrences = coOccurrencesBuilder.result()
+
+
+    //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    //  This is a try to deserialize it with avro4s
+    //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    /*
+    case class coocMap(map: Map[String, Int])
+    //implicit val fromRecord = FromRecord[coocMap]
+    val schema = AvroSchema[coocMap]
+    val is = AvroInputStream.data[coocMap](new File("coOccurrences.avro"))
+    val pizzas = is.iterator.toSet
+    is.close()
+    */
+
+    //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    //  calculate cosOfAngleMatrix and write it in a file
+    //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     new PrintWriter("cosOfAngleMatrix.txt") { // get new PrintWriter
 
@@ -383,6 +422,7 @@ object analogyExtraction {
       }
       close
     }
+
   }
 
 
@@ -394,6 +434,8 @@ object analogyExtraction {
     implicit val timeout = Duration(1000, "seconds") // is the timeout for the SearchIterator.hits method
     implicit val client = HttpClient(ElasticsearchClientUri("localhost", 9200)) // new client
     allCoOccurrences
+    //allDistances
     client.close() // close HttpClient
   }
 }
+

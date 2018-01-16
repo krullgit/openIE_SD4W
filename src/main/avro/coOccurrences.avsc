@@ -1,0 +1,1 @@
+{"type":"record","name":"wordList","namespace":"com.sksamuel.elastic4s.samples","fields":[{"name":"word","type":"string"},{"name":"cooc","type":{"type":"map","values":"int"}}]}
