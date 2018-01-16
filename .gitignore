@@ -5,7 +5,6 @@ allNamedEntitiesTransformations.txt
 allNamedEntitiesTransformations_small.txt
 allNerTyps.txt
 bdperson-test.avro
-coOccurrences.avro
 coOccurrences.txt
 coOccurrences_old.txt
 cosOfAngleMatrix.txt
