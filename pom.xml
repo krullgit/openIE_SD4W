@@ -100,19 +100,6 @@
         </dependency>
 
 
-        <dependency>
-            <groupId>org.apache.avro</groupId>
-            <artifactId>avro</artifactId>
-            <version>1.7.7</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>paranamer</artifactId>
-                    <groupId>com.thoughtworks.paranamer</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-
     </dependencies>
 
     <build>

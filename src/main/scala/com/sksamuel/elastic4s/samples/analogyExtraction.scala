@@ -4,6 +4,7 @@ package com.sksamuel.elastic4s.samples
 import java.io.{File, IOException, PrintWriter}
 import java.util.Properties
 
+import com.sksamuel.avro4s.AvroOutputStream
 import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.HttpClient
@@ -154,10 +155,11 @@ object analogyExtraction {
     val atleastCooccurence = 50
 
     var coOccurrences = scala.collection.mutable.Map[String, scala.collection.mutable.Map[String, Int]]()
-    val iterator = SearchIterator.hits(client, search("test" / "doc").matchAllQuery.keepAlive(keepAlive = "10m").size(100).sourceInclude(List("nerNorm", "nerTyp", "posLemmas"))) // returns 50 values and blocks until the iterator gets to the last element
 
+    val iterator = SearchIterator.hits(client, search("test" / "doc").matchAllQuery.keepAlive(keepAlive = "10m").size(100).sourceInclude(List("nerNorm", "nerTyp", "posLemmas"))) // returns 50 values and blocks until the iterator gets to the last element
     // use this for a small test set (approx 200)
     //val iterator = SearchIterator.hits(client, search("test") query matchQuery("nerNorm", "wellness") keepAlive (keepAlive = "10m") size (100) sourceInclude (List("nerNorm", "nerTyp", "posLemmas"))) // returns 50 values and blocks until the iterator gets to the last element
+
     var counter: Int = 0
     var countWords = 0
     iterator.foreach(searchhit => { // for each element in the iterator
@@ -261,20 +263,20 @@ object analogyExtraction {
       cleanedOrderedCoOccurrences2.foreach(x => write(x + "\n"))
       close // close file
     }
-    /*
+
     //case class coocMap(map: Map[String, Int])
-    case class wordList(word: String, cooc: Map[String,Int])
-    val schema = AvroSchema[wordList]
-    val os = AvroOutputStream.data[wordList](new File("coOccurrences.avro"))
+    case class wordListCaseClass(word: String, cooc: Map[String, Int])
+    //val schema = AvroSchema[wordListCaseClass]
+    val os = AvroOutputStream.data[wordListCaseClass](new File("coOccurrences.avro"))
 
     cleanedOrderedCoOccurrences2.toMap.foreach(x => {
       //val coocMap = List.newBuilder[coocMap]
       //val pepperoni = wordList(x._1, x._2)
-      os.write(Seq(wordList(x._1, x._2)))
+      os.write(Seq(wordListCaseClass(x._1, x._2)))
     })
     os.flush()
     os.close()
-    */
+
 
     println("ready with CoOccurrences")
     //allDistances(cleanedOrderedCoOccurrences2)
@@ -310,6 +312,9 @@ object analogyExtraction {
         System.out.println("Error reading Avro")
     }
     val coOccurrences = coOccurrencesBuilder.result()
+    val coOccurrenceSize = coOccurrences.size
+    println("size coOccurrences: " + coOccurrenceSize)
+    println("calculating....")
 
 
     //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -328,11 +333,13 @@ object analogyExtraction {
     //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     //  calculate cosOfAngleMatrix and write it in a file
     //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
+    var coOccurrencesCounter = 0
     new PrintWriter("cosOfAngleMatrix.txt") { // get new PrintWriter
 
       // coOccurrences e.g.: (administrative,Map(pay -> 1, role -> 1, disregard -> 1, but -> 1, remain -> 1, suggest -> 1, restrict -> 1, could -> 1, 's -> 1, spark -> 1, gaffe -> 1, nominal -> 1, demise -> 1, school -> 1, judge -> 1, boyle -> 1, privilege -> 1, cost -> 1, platform -> 1, staff -> 1, oshea -> 1, ; -> 1, manager -> 1, he -> 1, closure -> 1, she -> 1, failure -> 1, client -> 1, 5 -> 1, fatally -> 1, constant -> 1, day-to-day -> 1, note -> 1, until -> 1, pend -> 1, obama -> 1, not -> 1, set -> 1, nursing -> 1, of -> 1, charge -> 1, aas -> 1, director -> 1, ludicrous -> 1, function -> 1, both -> 1, take -> 1, have -> 1, diocese_of_fargo -> 1, public_opinion -> 1, include -> 1, approximately -> 1, down -> 1, you -> 1, now -> 1, teena_jibilian -> 1, / -> 1, book -> 1, some -> 1, leave -> 1, or -> 1, headquarters -> 1, relation -> 1, va -> 1, administrative -> 2, united_states -> 1, bursa -> 1, they -> 1, convenience -> 1, repository -> 1, will -> 1, chaos -> 1, base -> 1, -rrb- -> 1, shoot -> 1, use -> 1, state -> 1, be -> 1, put -> 1, broad -> 1, only -> 1, assistant -> 1, -lrb- -> 1, threat -> 1, from -> 1, dismiss -> 1, clear -> 1, datum -> 1, after -> 1, if -> 1, to -> 1, amount -> 1, url -> 1, employee -> 1, and -> 1, that -> 1, hussein_chahine -> 1, who -> 1, eradication -> 1, : -> 1, reassign -> 1, film -> 1, church -> 1, high_school -> 1, should -> 1, pps -> 1, sector -> 1, claim -> 1, daystreamNumber -> 1, confusion -> 1, number -> 1, sudden -> 1, effort -> 1, suppose -> 1, portland -> 1, for -> 1, a -> 1, allocate -> 1, involvement -> 1, fee -> 1, on -> 1, duty -> 1, chief -> 1, maintain -> 1, daystreamDate -> 1, with -> 1, legal -> 1, court -> 1, by -> 1, in -> 1, % -> 1, year -> 1, space -> 1, merely -> 1, ughelli_judicial_division -> 1, hold -> 1, future -> 1, post -> 1, deputy -> 1, '' -> 1, at -> 1, decision -> 1, since -> 1, operating -> 1, pastoral -> 1, we -> 1, stats -> 1, tom_jurich -> 1, machinery -> 1, officer -> 1, allow -> 1, train -> 1, structure -> 1, youth -> 1, these -> 1, `` -> 1, previously -> 1, bring -> 1, deportation -> 1, up -> 1, the -> 1, process -> 1, curtail -> 1, existing -> 1, service -> 1, render -> 1, so -> 1, it -> 1, feature -> 1, support -> 1, genuine -> 1, tom_rinehart -> 1, true -> 1, policy -> 1, - -> 1, practice -> 1, fun -> 1, amid -> 1, shape -> 1, hip -> 1, really -> 1, purpose -> 1, case -> 1, reach -> 1, connection-based -> 1, place -> 1, byzantine -> 1, financing -> 1, provide -> 1, online -> 1, lot -> 1, technology -> 1, two -> 1, tax -> 1, law -> 1, such -> 1, phase -> 1, federal -> 1, medical -> 1, create -> 1, reverse -> 1, unpaid -> 1, say -> 1, teacher -> 1, new -> 1, sick -> 1, accord -> 1, access -> 1, this -> 1, which -> 1, office -> 1, there -> 1, robust -> 1, sri_lanka -> 1, currently -> 1, financial -> 1, drive -> 1, -lsb- -> 1, other -> 1, athletic_director -> 1, as -> 1, under -> 1, completion -> 1, nearly -> 1, noronica -> 1, system -> 1))
       coOccurrences.foreach { case (firstWord, firstMap) => { // for each word in the map
+        System.out.println("calculating " + coOccurrencesCounter + " of " + coOccurrenceSize)
+        coOccurrencesCounter += 1
         var cosOfAngleMatrix = scala.collection.mutable.Map[String, ListMap[String, Double]]() // we can save the distances to other word vectors here
         cosOfAngleMatrix(firstWord) = ListMap[String, Double]() // make a entry for the current word
         val lengthFirstWordVector = math.floor(scala.math.sqrt(firstMap.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector
