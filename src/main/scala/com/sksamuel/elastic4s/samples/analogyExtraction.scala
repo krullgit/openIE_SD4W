@@ -529,12 +529,36 @@ object analogyExtraction {
   def calcDistanceOfDocs(doc1: String): Unit = {
     val borderForCosAngle: Double = 0.0
     val coOccurrences: Map[String, Map[String, Int]] = readAvro
-    val vectorDoc1: Map[String, Int] = doc1.split(" ").map(token => coOccurrences.get(token.toLowerCase())).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
-    val lengthFirstWordVector = math.floor(scala.math.sqrt(vectorDoc1.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector
     val props: Properties = new Properties() // set properties for annotator
     props.put("annotators", "tokenize, ssplit, pos, lemma, ner, regexner")
     props.put("regexner.mapping", "jg-regexner.txt")
     val pipeline: StanfordCoreNLP = new StanfordCoreNLP(props) // annotate file
+    def getNER(sentence: String): String = { // get POS tags per sentence
+      val document: Annotation = new Annotation(sentence)
+      pipeline.annotate(document) // annotate
+      val sentences: List[CoreMap] = document.get(classOf[SentencesAnnotation]).asScala.toList
+      val back = (for {
+        sentence: CoreMap <- sentences
+        token: CoreLabel <- sentence.get(classOf[TokensAnnotation]).asScala.toList
+        word: String = token.get(classOf[TextAnnotation])
+        pos: String = token.get(classOf[PartOfSpeechAnnotation])
+        lemma: String = token.get(classOf[LemmaAnnotation])
+        regexner: String = token.get(classOf[NamedEntityTagAnnotation])
+
+      } yield (lemma, regexner)).reduceLeft((tupleFirst, tupleSecond) => {
+        if (tupleFirst._2 == tupleSecond._2 && tupleSecond._2 != "O") {
+          (tupleFirst._1 + "_" + tupleSecond._1, tupleSecond._2)
+        } else {
+          (" " + tupleFirst._1 + " " + tupleSecond._1, tupleSecond._2)
+        }
+      })._1
+      println(back)
+      back
+    }
+
+    val vectorDoc1: Map[String, Int] = getNER(doc1).split(" ").map(token => coOccurrences.get(token.toLowerCase())).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
+    val lengthFirstWordVector = math.floor(scala.math.sqrt(vectorDoc1.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector
+
 
     while (true) {
 
@@ -549,28 +573,7 @@ object analogyExtraction {
 
 
         // input: one word / output: pos Tag of that word
-        def getNER(sentence: String) = { // get POS tags per sentence
-          val document: Annotation = new Annotation(sentence)
-          pipeline.annotate(document) // annotate
-          val sentences: List[CoreMap] = document.get(classOf[SentencesAnnotation]).asScala.toList
-          val back = (for {
-            sentence: CoreMap <- sentences
-            token: CoreLabel <- sentence.get(classOf[TokensAnnotation]).asScala.toList
-            word: String = token.get(classOf[TextAnnotation])
-            pos: String = token.get(classOf[PartOfSpeechAnnotation])
-            lemma: String = token.get(classOf[LemmaAnnotation])
-            regexner: String = token.get(classOf[NamedEntityTagAnnotation])
 
-          } yield (lemma, regexner)).reduceLeft((tupleFirst, tupleSecond) => {
-            if (tupleFirst._2 == tupleSecond._2 && tupleSecond._2 != "O") {
-              (tupleFirst._1 + "_" + tupleSecond._1, tupleSecond._2)
-            } else {
-              (" " + tupleFirst._1 + " " + tupleSecond._1, tupleSecond._2)
-            }
-          })._1
-          println(back)
-
-        }
 
 
 
