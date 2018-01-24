@@ -477,74 +477,86 @@ object analogyExtraction {
   //  calculate the distance of a document to another
   //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  def calcDistanceOfDocs(doc1: String, doc2: String): Unit = {
+  def calcDistanceOfDocs(doc1: String): Unit = {
     val borderForCosAngle: Double = 0.0
     val coOccurrences: Map[String, Map[String, Int]] = readAvro
-
-    //val vectorDoc1: Array[Map[String, Int]] = doc1.split(" ").map(token => coOccurrences.get(token) match {case Some(x) => x})
-    //val vectorDoc1: Array[(String, Int)] = doc1.split(" ").map(token => coOccurrences.get(token) match {case Some(x) => x}).flatten
     val vectorDoc1: Map[String, Int] = doc1.split(" ").map(token => coOccurrences.get(token)).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
-    val vectorDoc2: Map[String, Int] = doc2.split(" ").map(token => coOccurrences.get(token)).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
-
-
-    var cosOfAngleMatrix = scala.collection.mutable.Map[String, ListMap[String, Double]]() // we can save the distances to other word vectors here
-    cosOfAngleMatrix("doc1") = ListMap[String, Double]() // make a entry for the current word
     val lengthFirstWordVector = math.floor(scala.math.sqrt(vectorDoc1.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector
-    println("lengthFirstWordVector: " + lengthFirstWordVector)
 
-    //coOccurrences.foreach { case (secondWord, secondMap) => { // get the seconds word for comparison
-    var dotProductFirstWordSecondWord: Int = 0 // initiate the dotproduct
-    vectorDoc2.foreach { case (wordInSecondMap, countInSecondMap) => { // get every word in the second word
-      vectorDoc1.get(wordInSecondMap) match { // and look if this words are present in the first word
-        case Some(countInFirstMap) => {
-          dotProductFirstWordSecondWord += countInFirstMap * countInSecondMap // if both words occur in both word vectors calculate the product
+    while (true) {
+
+
+      val doc2: String = scala.io.StdIn.readLine()
+      helpMethod()
+
+      def helpMethod(): Unit = {
+
+        //val vectorDoc1: Array[Map[String, Int]] = doc1.split(" ").map(token => coOccurrences.get(token) match {case Some(x) => x})
+        //val vectorDoc1: Array[(String, Int)] = doc1.split(" ").map(token => coOccurrences.get(token) match {case Some(x) => x}).flatten
+
+        val vectorDoc2: Map[String, Int] = doc2.split(" ").map(token => coOccurrences.get(token)).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
+
+
+        var cosOfAngleMatrix = scala.collection.mutable.Map[String, ListMap[String, Double]]() // we can save the distances to other word vectors here
+        cosOfAngleMatrix("doc1") = ListMap[String, Double]() // make a entry for the current word
+
+        println("lengthFirstWordVector: " + lengthFirstWordVector)
+
+        //coOccurrences.foreach { case (secondWord, secondMap) => { // get the seconds word for comparison
+        var dotProductFirstWordSecondWord: Int = 0 // initiate the dotproduct
+        vectorDoc2.foreach { case (wordInSecondMap, countInSecondMap) => { // get every word in the second word
+          vectorDoc1.get(wordInSecondMap) match { // and look if this words are present in the first word
+            case Some(countInFirstMap) => {
+              dotProductFirstWordSecondWord += countInFirstMap * countInSecondMap // if both words occur in both word vectors calculate the product
+            }
+            case None => // this case is not interesting
+          }
         }
-        case None => // this case is not interesting
+        }
+        println("dotProductFirstWordSecondWord: " + dotProductFirstWordSecondWord)
+        //if (dotProductFirstWordSecondWord > 0) {
+
+        val lengthSecondWordVector = math.floor(scala.math.sqrt(math.floor(vectorDoc2.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2)) * 100) / 100) * 100) / 100 // length of second word vector
+        println("lengthSecondWordVector: " + lengthSecondWordVector)
+        val cosOfAngleFirstWordSecondWord: Double = dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector) // cosAngle
+        if (lengthSecondWordVector > 0 && lengthSecondWordVector > 0 && cosOfAngleFirstWordSecondWord > borderForCosAngle) { // filter results
+          //println("firstWord: "+firstWord+"secondWord: "+secondWord)
+          val tmp: ListMap[String, Double] = cosOfAngleMatrix("doc1").updated("doc2", (math floor cosOfAngleFirstWordSecondWord * 1000) / 1000)
+          //cosOfAngleMatrix(firstWord)(secondWord) = (math floor cosOfAngleFirstWordSecondWord * 100) / 100
+          cosOfAngleMatrix("doc1") = tmp
+        } else {
+
+        }
+        //}
+        //}
+
+
+        ////
+        // calculate the relative cosine angle
+        ////
+        /*
+      def relCosSimMatrix(cosOfAngleMap: Map[String, Double]): ListMap[String, Double] = {
+        //if(cosOfAngleMap.size > 0){
+        val returnValue: Map[String, Double] = (for (currentTuple <- cosOfAngleMap) yield {
+          val cosineSimCurrent: Double = cosOfAngleMap(currentTuple._1)
+          val sumCosineSimTop10: Double = cosOfAngleMap.reduce((tuple1, tuple2) => ("placeholder", tuple1._2 + tuple2._2))._2 - currentTuple._2
+          if (sumCosineSimTop10 > 0) {
+            (currentTuple._1, cosineSimCurrent / sumCosineSimTop10)
+          } else {
+            (currentTuple._1, 0.0)
+          }
+        }).filter(x => x._2 >= 0.11)
+        ListMap(returnValue.toList.sortBy {
+          _._2
+        }.reverse: _*) // return ordered soultions
+      }
+
+
+      cosOfAngleMatrix("doc1") = relCosSimMatrix(cosOfAngleMatrix("doc1").filter(x => x._1 != "doc1"))*/
+        println(cosOfAngleMatrix.values)
+        cosOfAngleMatrix.empty
       }
     }
-    }
-    println("dotProductFirstWordSecondWord: " + dotProductFirstWordSecondWord)
-    //if (dotProductFirstWordSecondWord > 0) {
-
-    val lengthSecondWordVector = math.floor(scala.math.sqrt(math.floor(vectorDoc2.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2)) * 100) / 100) * 100) / 100 // length of second word vector
-    println("lengthSecondWordVector: " + lengthSecondWordVector)
-    val cosOfAngleFirstWordSecondWord: Double = dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector) // cosAngle
-    if (lengthSecondWordVector > 0 && lengthSecondWordVector > 0 && cosOfAngleFirstWordSecondWord > borderForCosAngle) { // filter results
-      //println("firstWord: "+firstWord+"secondWord: "+secondWord)
-      val tmp: ListMap[String, Double] = cosOfAngleMatrix("doc1").updated("doc2", (math floor cosOfAngleFirstWordSecondWord * 1000) / 1000)
-      //cosOfAngleMatrix(firstWord)(secondWord) = (math floor cosOfAngleFirstWordSecondWord * 100) / 100
-      cosOfAngleMatrix("doc1") = tmp
-    } else {
-
-    }
-    //}
-    //}
-
-
-    ////
-    // calculate the relative cosine angle
-    ////
-    /*
-    def relCosSimMatrix(cosOfAngleMap: Map[String, Double]): ListMap[String, Double] = {
-      //if(cosOfAngleMap.size > 0){
-      val returnValue: Map[String, Double] = (for (currentTuple <- cosOfAngleMap) yield {
-        val cosineSimCurrent: Double = cosOfAngleMap(currentTuple._1)
-        val sumCosineSimTop10: Double = cosOfAngleMap.reduce((tuple1, tuple2) => ("placeholder", tuple1._2 + tuple2._2))._2 - currentTuple._2
-        if (sumCosineSimTop10 > 0) {
-          (currentTuple._1, cosineSimCurrent / sumCosineSimTop10)
-        } else {
-          (currentTuple._1, 0.0)
-        }
-      }).filter(x => x._2 >= 0.11)
-      ListMap(returnValue.toList.sortBy {
-        _._2
-      }.reverse: _*) // return ordered soultions
-    }
-
-
-    cosOfAngleMatrix("doc1") = relCosSimMatrix(cosOfAngleMatrix("doc1").filter(x => x._1 != "doc1"))*/
-    println(cosOfAngleMatrix.values)
-    cosOfAngleMatrix.empty
 
   }
 
@@ -560,7 +572,7 @@ object analogyExtraction {
     //allDistances
     val doc1 = "car crash in New York"
     val doc2 = "Accident in Manhattan"
-    calcDistanceOfDocs(doc1, doc2)
+    calcDistanceOfDocs(doc1)
     client.close() // close HttpClient
   }
 }
