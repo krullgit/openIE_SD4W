@@ -572,18 +572,7 @@ object analogyExtraction {
         //val vectorDoc1: Array[(String, Int)] = doc1.split(" ").map(token => coOccurrences.get(token) match {case Some(x) => x}).flatten
 
 
-        // input: one word / output: pos Tag of that word
-
-
-
-
-
-        // return List of POS tags
-
-
-        getNER(doc2)
-
-        val vectorDoc2: Map[String, Int] = doc2.split(" ").map(token => coOccurrences.get(token.toLowerCase())).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
+        val vectorDoc2: Map[String, Int] = getNER(doc2).split(" ").map(token => coOccurrences.get(token.toLowerCase())).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
 
 
         var cosOfAngleMatrix = scala.collection.mutable.Map[String, ListMap[String, Double]]() // we can save the distances to other word vectors here
