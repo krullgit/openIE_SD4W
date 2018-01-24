@@ -9,7 +9,56 @@ import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.search.{SearchHit, SearchIterator}
-import edu.stanford.nlp.ling.CoreAnnotations.{PartOfSpeechAnnotation, SentencesAnnotation, TokensAnnotation}
+import edu.stanford.nlp.ling.CoreAnnotations.{NamedEntityTagAnnotation, LemmaAnnotation, PartOfSpeechAnnotation, SentencesAnnotation, TextAnnotation, TokensAnnotation}
+import edu.stanford.nlp.ling.CoreLabel
+import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
+import edu.stanford.nlp.util.CoreMap
+
+import scala.collection.JavaConverters._
+
+/**
+  * Created by harshal on 1/11/17.
+  */
+object RegexNamedEntityRecognizerExample {
+
+  def main(args: Array[String]): Unit = {
+    val props: Properties = new Properties()
+    props.put("annotators", "tokenize, ssplit, pos, lemma, ner, regexner")
+    props.put("regexner.mapping", "src/main/resources/jg-regexner.txt")
+
+    val pipeline: StanfordCoreNLP = new StanfordCoreNLP(props)
+
+    // read some text from a file - Uncomment this and comment the val text = "Quick...." below to load from a file
+    //val inputFile: File = new File("src/test/resources/sample-content.txt")
+    //val text: String = Files.toString(inputFile, Charset.forName("UTF-8"))
+    val text = "Quick brown fox jumps over the lazy dog because he stole 20 dollars. This is Harshal. My home country is India. Today is 12th January 2017. This is 100% right. I have completed my Bachelor of Technology"
+
+    // create blank annotator
+    val document: Annotation = new Annotation(text)
+
+    // run all Annotator - Tokenizer on this text
+    pipeline.annotate(document)
+
+    val sentences: List[CoreMap] = document.get(classOf[SentencesAnnotation]).asScala.toList
+
+    (for {
+      sentence: CoreMap <- sentences
+      token: CoreLabel <- sentence.get(classOf[TokensAnnotation]).asScala.toList
+      word: String = token.get(classOf[TextAnnotation])
+      pos: String = token.get(classOf[PartOfSpeechAnnotation])
+      lemma: String = token.get(classOf[LemmaAnnotation])
+      regexner: String = token.get(classOf[NamedEntityTagAnnotation])
+
+
+    } yield (token, word, pos, lemma, regexner)) foreach (t => println("token: " + t._1 + " word: " + t._2 + " pos: " + t._3 + " lemma: " + t._4 + " ner (with regex):" + t._5))
+
+
+  }
+
+}
+
+
+
 import edu.stanford.nlp.ling.CoreLabel
 import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
 import edu.stanford.nlp.util.CoreMap
@@ -480,8 +529,12 @@ object analogyExtraction {
   def calcDistanceOfDocs(doc1: String): Unit = {
     val borderForCosAngle: Double = 0.0
     val coOccurrences: Map[String, Map[String, Int]] = readAvro
-    val vectorDoc1: Map[String, Int] = doc1.split(" ").map(token => coOccurrences.get(token)).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
+    val vectorDoc1: Map[String, Int] = doc1.split(" ").map(token => coOccurrences.get(token.toLowerCase())).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
     val lengthFirstWordVector = math.floor(scala.math.sqrt(vectorDoc1.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector
+    val props: Properties = new Properties() // set properties for annotator
+    props.put("annotators", "tokenize, ssplit, pos, lemma, ner, regexner")
+    props.put("regexner.mapping", "jg-regexner.txt")
+    val pipeline: StanfordCoreNLP = new StanfordCoreNLP(props) // annotate file
 
     while (true) {
 
@@ -494,7 +547,40 @@ object analogyExtraction {
         //val vectorDoc1: Array[Map[String, Int]] = doc1.split(" ").map(token => coOccurrences.get(token) match {case Some(x) => x})
         //val vectorDoc1: Array[(String, Int)] = doc1.split(" ").map(token => coOccurrences.get(token) match {case Some(x) => x}).flatten
 
-        val vectorDoc2: Map[String, Int] = doc2.split(" ").map(token => coOccurrences.get(token)).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
+
+        // input: one word / output: pos Tag of that word
+        def getNER(sentence: String) = { // get POS tags per sentence
+          val document: Annotation = new Annotation(sentence)
+          pipeline.annotate(document) // annotate
+          val sentences: List[CoreMap] = document.get(classOf[SentencesAnnotation]).asScala.toList
+          val back = (for {
+            sentence: CoreMap <- sentences
+            token: CoreLabel <- sentence.get(classOf[TokensAnnotation]).asScala.toList
+            word: String = token.get(classOf[TextAnnotation])
+            pos: String = token.get(classOf[PartOfSpeechAnnotation])
+            lemma: String = token.get(classOf[LemmaAnnotation])
+            regexner: String = token.get(classOf[NamedEntityTagAnnotation])
+
+          } yield (lemma, regexner)).reduceLeft((tupleFirst, tupleSecond) => {
+            if (tupleFirst._2 == tupleSecond._2 && tupleSecond._2 != "O") {
+              (tupleFirst._1 + "_" + tupleSecond._1, tupleSecond._2)
+            } else {
+              (" " + tupleFirst._1 + " " + tupleSecond._1, tupleSecond._2)
+            }
+          })._1
+          println(back)
+
+        }
+
+
+
+
+        // return List of POS tags
+
+
+        getNER(doc2)
+
+        val vectorDoc2: Map[String, Int] = doc2.split(" ").map(token => coOccurrences.get(token.toLowerCase())).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
 
 
         var cosOfAngleMatrix = scala.collection.mutable.Map[String, ListMap[String, Double]]() // we can save the distances to other word vectors here
@@ -562,7 +648,7 @@ object analogyExtraction {
 
 
   ////////////////////
-  // END
+  // END_b
   ////////////////////
 
   def main(args: Array[String]): Unit = {
