@@ -501,7 +501,7 @@ object analogyExtraction {
     //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     val coOccurrencesBuilder = ListMap.newBuilder[String, Map[String, Int]]
-    val avroOutput: File = new File("coOccurrences.avro")
+    val avroOutput: File = new File("coOccurrences_big.avro")
     try {
       val bdPersonDatumReader = new SpecificDatumReader[wordList](classOf[wordList])
       val dataFileReader = new DataFileReader[wordList](avroOutput, bdPersonDatumReader)
