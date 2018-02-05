@@ -634,7 +634,7 @@ object analogyExtraction {
           //cosOfAngleMatrix(firstWord)(secondWord) = (math floor cosOfAngleFirstWordSecondWord * 100) / 100
           cosOfAngleMatrix("doc1") = tmp
           println("//dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector)")
-          println("similarity 0 to 1: " + tmp)
+          println("similarity 0 to 1: " + cosOfAngleFirstWordSecondWord)
         } else {
 
         }
@@ -662,7 +662,6 @@ object analogyExtraction {
 
 
       cosOfAngleMatrix("doc1") = relCosSimMatrix(cosOfAngleMatrix("doc1").filter(x => x._1 != "doc1"))*/
-        println("similarity 0 to 1: " + cosOfAngleMatrix)
         cosOfAngleMatrix.empty
       }
     }
