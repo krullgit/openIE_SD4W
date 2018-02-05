@@ -584,7 +584,8 @@ object analogyExtraction {
     var lengthFirstWordVector: Double = lengthOfVector(vectorDoc1)
 
     while (true) {
-      print("doc 1: " + doc1)
+      println("")
+      println("doc 1: " + doc1)
       print("set doc 2: ")
       val doc2: String = scala.io.StdIn.readLine() // ask for doc 2
 
@@ -603,20 +604,26 @@ object analogyExtraction {
 
         val vectorDoc2: Map[String, Int] = accumulatedDocumentVector(doc2)
         val lengthSecondWordVector = math.floor(scala.math.sqrt(math.floor(vectorDoc2.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2)) * 100) / 100) * 100) / 100 // length of second word vector
+        println("doc 1 # words: " + vectorDoc1.size)
+        println("doc 2 # words: " + vectorDoc2.size)
         println("doc 1 lengthVector: " + lengthFirstWordVector)
         println("doc 2 lengthVector: " + lengthSecondWordVector)
 
         var dotProductFirstWordSecondWord: Int = 0 // initiate the dotproduct
+        var countWordsInBothDocuments: Int = 0
         vectorDoc2.foreach { case (wordInSecondMap, countInSecondMap) => { // get every word in the second word
           vectorDoc1.get(wordInSecondMap) match { // and look if this words are present in the first word
             case Some(countInFirstMap) => {
               dotProductFirstWordSecondWord += countInFirstMap * countInSecondMap // if both words occur in both word vectors calculate the product
+              countWordsInBothDocuments += 1
             }
             case None => // this case is not interesting
           }
         }
         }
-        println("dotProductFirstWordSecondWord: " + dotProductFirstWordSecondWord)
+
+        println("doc 1 & doc 2 # words in both: " + countWordsInBothDocuments)
+        println("doc 1 & doc 2 dotProduct: " + dotProductFirstWordSecondWord)
 
 
         val cosOfAngleFirstWordSecondWord: Double = dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector) // cosAngle
@@ -625,6 +632,8 @@ object analogyExtraction {
           val tmp: ListMap[String, Double] = cosOfAngleMatrix("doc1").updated("doc2", (math floor cosOfAngleFirstWordSecondWord * 1000) / 1000)
           //cosOfAngleMatrix(firstWord)(secondWord) = (math floor cosOfAngleFirstWordSecondWord * 100) / 100
           cosOfAngleMatrix("doc1") = tmp
+          println("//dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector)")
+          println("similarity 0 to 1: " + tmp)
         } else {
 
         }
