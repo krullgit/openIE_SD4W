@@ -517,7 +517,7 @@ object analogyExtraction {
     }
     var coOccurrences: Map[String, Map[String, Int]] = coOccurrencesBuilder.result()
     val coOccurrenceSize = coOccurrences.size
-    println("size coOccurrences: " + coOccurrenceSize)
+    println("size AVRO: " + coOccurrenceSize)
     coOccurrences
   }
 
@@ -532,8 +532,10 @@ object analogyExtraction {
     // get coOccurrences from avro file (takes a while)
     println("READ AVRO")
     val coOccurrences: Map[String, Map[String, Int]] = readAvro
+    println("READY READ AVRO")
 
     // load the stanford annotator for NER tagging and lemmatisation
+    println("LOADING STANFORD PARSER")
     val props: Properties = new Properties() // set properties for annotator
     props.put("annotators", "tokenize, ssplit, pos, lemma, ner, regexner")
     props.put("regexner.mapping", "jg-regexner.txt")
@@ -563,6 +565,8 @@ object analogyExtraction {
       back
     }
 
+    println("READY LOADING STANFORD PARSER")
+
     // get the accumulated vector
 
     def accumulatedDocumentVector(doc: String): Map[String, Int] = {
@@ -581,8 +585,11 @@ object analogyExtraction {
       math.floor(scala.math.sqrt(vectorDoc.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector with two digit precision
     }
 
+
+    println("CALC LENGTH OF DOC 1")
     var vectorDoc1: Map[String, Int] = accumulatedDocumentVector(doc1)
     var lengthFirstWordVector: Double = lengthOfVector(vectorDoc1)
+    println("READY CALC LENGTH OF DOC 1")
 
     while (true) {
       println("")
