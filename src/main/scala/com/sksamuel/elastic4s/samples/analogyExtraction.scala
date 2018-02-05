@@ -525,8 +525,9 @@ object analogyExtraction {
   //  calculate the distance of a document to another
   //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  def calcDistanceOfDocs(doc1: String): Unit = {
+  def calcDistanceOfDocs(doc: String): Unit = {
     val borderForCosAngle: Double = 0.0 // not important atm
+    var doc1 = doc
 
     // get coOccurrences from avro file (takes a while)
     println("READ AVRO")
@@ -592,7 +593,7 @@ object analogyExtraction {
       // possibility to change doc 1
       if (doc2 == "0") {
         print("set doc 1: ")
-        val doc1: String = scala.io.StdIn.readLine() // ask for doc 1
+        doc1 = scala.io.StdIn.readLine() // ask for doc 1
         vectorDoc1 = accumulatedDocumentVector(doc1)
         lengthFirstWordVector = lengthOfVector(vectorDoc1)
       }
