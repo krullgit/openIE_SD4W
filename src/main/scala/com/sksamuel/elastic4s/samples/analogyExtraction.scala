@@ -9,55 +9,7 @@ import com.sksamuel.elastic4s.ElasticsearchClientUri
 import com.sksamuel.elastic4s.http.ElasticDsl._
 import com.sksamuel.elastic4s.http.HttpClient
 import com.sksamuel.elastic4s.http.search.{SearchHit, SearchIterator}
-import edu.stanford.nlp.ling.CoreAnnotations.{NamedEntityTagAnnotation, LemmaAnnotation, PartOfSpeechAnnotation, SentencesAnnotation, TextAnnotation, TokensAnnotation}
-import edu.stanford.nlp.ling.CoreLabel
-import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
-import edu.stanford.nlp.util.CoreMap
-
-import scala.collection.JavaConverters._
-
-/**
-  * Created by harshal on 1/11/17.
-  */
-object RegexNamedEntityRecognizerExample {
-
-  def main(args: Array[String]): Unit = {
-    val props: Properties = new Properties()
-    props.put("annotators", "tokenize, ssplit, pos, lemma, ner, regexner")
-    props.put("regexner.mapping", "src/main/resources/jg-regexner.txt")
-
-    val pipeline: StanfordCoreNLP = new StanfordCoreNLP(props)
-
-    // read some text from a file - Uncomment this and comment the val text = "Quick...." below to load from a file
-    //val inputFile: File = new File("src/test/resources/sample-content.txt")
-    //val text: String = Files.toString(inputFile, Charset.forName("UTF-8"))
-    val text = "Quick brown fox jumps over the lazy dog because he stole 20 dollars. This is Harshal. My home country is India. Today is 12th January 2017. This is 100% right. I have completed my Bachelor of Technology"
-
-    // create blank annotator
-    val document: Annotation = new Annotation(text)
-
-    // run all Annotator - Tokenizer on this text
-    pipeline.annotate(document)
-
-    val sentences: List[CoreMap] = document.get(classOf[SentencesAnnotation]).asScala.toList
-
-    (for {
-      sentence: CoreMap <- sentences
-      token: CoreLabel <- sentence.get(classOf[TokensAnnotation]).asScala.toList
-      word: String = token.get(classOf[TextAnnotation])
-      pos: String = token.get(classOf[PartOfSpeechAnnotation])
-      lemma: String = token.get(classOf[LemmaAnnotation])
-      regexner: String = token.get(classOf[NamedEntityTagAnnotation])
-
-
-    } yield (token, word, pos, lemma, regexner)) foreach (t => println("token: " + t._1 + " word: " + t._2 + " pos: " + t._3 + " lemma: " + t._4 + " ner (with regex):" + t._5))
-
-
-  }
-
-}
-
-
+import edu.stanford.nlp.ling.CoreAnnotations._
 import edu.stanford.nlp.ling.CoreLabel
 import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
 import edu.stanford.nlp.util.CoreMap
@@ -196,27 +148,31 @@ object analogyExtraction {
   ////////////////////
 
 
-  def allCoOccurrences(implicit client: HttpClient) {
-
-    val userQuery: List[String] = List("Important", "personality", "New ~ York", "work", "stock ~ market")
+  def allCoOccurrences(atleastCooccurence: Int = 0)(implicit client: HttpClient) {
     implicit val timeout = Duration(1000, "seconds") // is the timeout for the SearchIterator.hits method
     val windowWidth: Int = 9
-    val atleastCooccurence = 50
     var coOccurrences = scala.collection.mutable.Map[String, scala.collection.mutable.Map[String, Int]]()
-    //val iterator = SearchIterator.hits(client, search("test" / "doc").matchAllQuery.keepAlive(keepAlive = "10m").size(100).sourceInclude(List("nerNorm", "nerTyp", "posLemmas"))) // returns 50 values and blocks until the iterator gets to the last element
-    // use this for a small test set (approx 200)
     var counter: Int = 0
     var countWords = 0
 
-    def cooc(numberOfResults: Int, iterator: Iterator[SearchHit]): Unit = {
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+    // this function takes sentences from elastic, transform them and feed the cooc matrix
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    def cooc(numberOfResults: Int = 0, iterator: Iterator[SearchHit]): Unit = {
       var iteratorCounter = 0
       iterator.foreach(searchhit => { // for each element in the iterator
-        if (iteratorCounter >= numberOfResults) {
+        if (iteratorCounter >= numberOfResults && numberOfResults != 0) { // make it possible to retain only a fixed number of coocs
           return
         }
         iteratorCounter += 1
-        println(counter);
+        println("counter: " + counter);
         counter += 1
+
+        // - - - - - - - - - - - - - - - - - - - - - - - - -
+        // filter words that we don't line (internet stuff mostly)
+        // - - - - - - - - - - - - - - - - - - - - - - - - -
+
         val cleaned0 = searchhit.sourceField("posLemmas").toString.split(" ~ ").toList
 
           .filter(x => !x.matches("http" + ".*")
@@ -226,21 +182,34 @@ object analogyExtraction {
             && !x.matches(".*" + ".org" + ".*")
             && !x.matches(".*" + ".net" + ".*")
             && !x.matches("<img" + ".*")
-            && !x.matches("http" + ".*"))
+            && !x.matches("http" + ".*")
+            && !x.matches("-lsb-")
+            && !x.matches("-rrb-"))
           .map(x => x.toLowerCase) // filter result (www, http, <a)
+
+        // - - - - - - - - - - - - - - - - - - - - - - - - -
+        // lowercase NER Norms and NER types & get a List with replacements for later use
+        // - - - - - - - - - - - - - - - - - - - - - - - - -
 
         val NerNorms: List[String] = searchhit.sourceField("nerNorm").toString.split(" ~ ").toList.map(x => x.toLowerCase)
         val NerTypes: List[String] = searchhit.sourceField("nerTyp").toString.split(" ~ ").toList.map(x => x.toLowerCase)
         val namedEntitiesTransformations: mutable.Map[String, String] = namedEntitiesTransformation(NerNorms, NerTypes)
+
+        // - - - - - - - - - - - - - - - - - - - - - - - - -
+        // replace with NER tags
+        // - - - - - - - - - - - - - - - - - - - - - - - - -
 
         val cleaned1 = namedEntitiesTransformations.foldLeft(cleaned0.mkString(" "))((a, b) => a.replaceAllLiterally(" " + b._1 + " ", " " + b._2 + " ")).split(" ").toList
         val cleaned2: List[List[String]] = cleaned1.mkString(" ").split("[?.!]").map(x => x.split(" ").toList.filter(!_.equals(""))).toList // ssplit
 
         cleaned2.foreach(x => x.foreach(x => countWords += 1))
 
+        // - - - - - - - - - - - - - - - - - - - - - - - - -
+        // calc coocs
+        // - - - - - - - - - - - - - - - - - - - - - - - - -
 
         cleaned2.foreach(sentence => {
-          val appending = (0 to windowWidth / 2).map(x => "imunimportant").toList
+          val appending = (0 to windowWidth / 2).map(x => "imunimportant").toList // important because we have to enlarge the sentence so that the sliding window starts at the forst word
           val enlargedSentence = appending ::: sentence ::: appending
 
           enlargedSentence
@@ -281,21 +250,29 @@ object analogyExtraction {
       })
     }
 
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+    // feed the cooc matrix with results from elastic
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
 
+    cooc(numberOfResults = 100, iterator = SearchIterator.hits(client, search("test") matchAllQuery() keepAlive (keepAlive = "10m") size (100) sourceInclude (List("nerNorm", "nerTyp", "posLemmas")))) // returns 100 values and blocks until the iterator gets to the last element
+    //cooc(numberOfResults = 100, SearchIterator.hits(client, search("test") query matchQuery("posLemmas", "personality New York work stock market") keepAlive (keepAlive = "10m") size (100) sourceInclude (List("nerNorm", "nerTyp", "posLemmas")))) // returns 50 values and blocks until the iterator gets to the last element
+    //cooc(numberOfResults = 1000, SearchIterator.hits(client, search("test") query matchQuery("posLemmas", "important") keepAlive (keepAlive = "10m") size (100) sourceInclude (List("nerNorm", "nerTyp", "posLemmas")))) // returns 50 values and blocks until the iterator gets to the last element
 
-
-    // feed the cooc matrix
-    cooc(numberOfResults = 100, SearchIterator.hits(client, search("test") query matchQuery("posLemmas", "personality New York work stock market") keepAlive (keepAlive = "10m") size (100) sourceInclude (List("nerNorm", "nerTyp", "posLemmas")))) // returns 50 values and blocks until the iterator gets to the last element
-    cooc(numberOfResults = 1000, SearchIterator.hits(client, search("test") query matchQuery("posLemmas", "important") keepAlive (keepAlive = "10m") size (100) sourceInclude (List("nerNorm", "nerTyp", "posLemmas")))) // returns 50 values and blocks until the iterator gets to the last element
-
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+    // filter the coOccurrences, they have to have a least 50 different cooccurence words AND order
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
 
     println("countWords: " + countWords)
     println("size(coOccurrences): " + coOccurrences.size)
     /*val cleanedOrderedCoOccurrences = ListMap(coOccurrences.retain((k, v) => {/*if(v.size > 500){println("groesser 500"+v.size)};if(v.size > atleastCooccurence && v.size < 300){println("groesser atleastCooccurence")};*/v.size > atleastCooccurence}).toList.sortBy {*/
     val cleanedOrderedCoOccurrences: ListMap[String, mutable.Map[String, Int]] = ListMap(coOccurrences.retain((k, v) => v.size > atleastCooccurence).toList.sortBy {
       _._1
-    }: _*) // filter the coOccurrences, they have to have a least 50 different cooccurence words AND order
+    }: _*)
     println("size(cleanedOrderedCoOccurrences): " + cleanedOrderedCoOccurrences.size)
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+    // load stanford parser
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
 
     val props: Properties = new Properties() // set properties for annotator
     props.put("annotators", "tokenize, ssplit,pos") // set properties
@@ -314,9 +291,13 @@ object analogyExtraction {
       back.mkString("")
     }
 
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+    // filter occurrences, only keep words with these POS: JJ JJR JJS NN NNS NNP NNPS PDT RB RBR RBS RP VB VBD VBG VBN VBP VBZ VBG
+    // cooccurences are not affected
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
 
     val cleanedOrderedCoOccurrences2: ListMap[String, Map[String, Int]] = cleanedOrderedCoOccurrences.filter(x => {
-      getPOS(x._1) == "JJ" || getPOS(x._1) == "JJR" || getPOS(x._1) == "JJS" || getPOS(x._1) == "NN" || getPOS(x._1) == "NNS" || getPOS(x._1) == "NNP" || getPOS(x._1) == "NNPS" || getPOS(x._1) == "PDT" || getPOS(x._1) == "RB" || getPOS(x._1) == "RBR" || getPOS(x._1) == "RBS" || getPOS(x._1) == "RP" || getPOS(x._1) == "VB" || getPOS(x._1) == "VBD" || getPOS(x._1) == "VBG" || getPOS(x._1) == "VBN" || getPOS(x._1) == "VBP" || getPOS(x._1) == "VBZ" || getPOS(x._1) == "VBG" || getPOS(x._1) == "VBG"
+      getPOS(x._1) == "JJ" || getPOS(x._1) == "JJR" || getPOS(x._1) == "JJS" || getPOS(x._1) == "NN" || getPOS(x._1) == "NNS" || getPOS(x._1) == "NNP" || getPOS(x._1) == "NNPS" || getPOS(x._1) == "PDT" || getPOS(x._1) == "RB" || getPOS(x._1) == "RBR" || getPOS(x._1) == "RBS" || getPOS(x._1) == "RP" || getPOS(x._1) == "VB" || getPOS(x._1) == "VBD" || getPOS(x._1) == "VBG" || getPOS(x._1) == "VBN" || getPOS(x._1) == "VBP" || getPOS(x._1) == "VBZ" || getPOS(x._1) == "VBG"
     }).map(x => (x._1, x._2.toMap))
     println("size(cleanedOrderedCoOccurrences2): " + cleanedOrderedCoOccurrences2.size)
 
@@ -333,7 +314,6 @@ object analogyExtraction {
     // - - - - - - - - - - - - - - - - - - - - - - - - -
     // write it to an avro
     // - - - - - - - - - - - - - - - - - - - - - - - - -
-
 
     case class wordListCaseClass(word: String, cooc: Map[String, Int])
     val os = AvroOutputStream.data[wordListCaseClass](new File("coOccurrences.avro"))
@@ -564,7 +544,6 @@ object analogyExtraction {
       println("NER & lemma: " + back)
       back
     }
-
     println("READY LOADING STANFORD PARSER")
 
     // get the accumulated vector
@@ -585,11 +564,8 @@ object analogyExtraction {
       math.floor(scala.math.sqrt(vectorDoc.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector with two digit precision
     }
 
-
-    println("CALC LENGTH OF DOC 1")
     var vectorDoc1: Map[String, Int] = accumulatedDocumentVector(doc1)
     var lengthFirstWordVector: Double = lengthOfVector(vectorDoc1)
-    println("READY CALC LENGTH OF DOC 1")
 
     while (true) {
       println("")
@@ -683,11 +659,10 @@ object analogyExtraction {
   def main(args: Array[String]): Unit = {
     implicit val timeout = Duration(1000, "seconds") // is the timeout for the SearchIterator.hits method
     implicit val client = HttpClient(ElasticsearchClientUri("localhost", 9200)) // new client
-    //allCoOccurrences
+    allCoOccurrences()
     //allDistances
-    val doc1 = "car crash in New York"
-    //val doc2 = "Accident in Manhattan"
-    calcDistanceOfDocs(doc1)
+    //"Accident in Manhattan"
+    //calcDistanceOfDocs("car crash in New York")
     client.close() // close HttpClient
   }
 }
