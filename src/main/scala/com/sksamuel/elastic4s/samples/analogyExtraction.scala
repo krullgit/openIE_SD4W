@@ -58,7 +58,6 @@ object RegexNamedEntityRecognizerExample {
 }
 
 
-
 import edu.stanford.nlp.ling.CoreLabel
 import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
 import edu.stanford.nlp.util.CoreMap
@@ -527,8 +526,13 @@ object analogyExtraction {
   //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   def calcDistanceOfDocs(doc1: String): Unit = {
-    val borderForCosAngle: Double = 0.0
+    val borderForCosAngle: Double = 0.0 // not important atm
+
+    // get coOccurrences from avro file (takes a while)
+    println("READ AVRO")
     val coOccurrences: Map[String, Map[String, Int]] = readAvro
+
+    // load the stanford annotator for NER tagging and lemmatisation
     val props: Properties = new Properties() // set properties for annotator
     props.put("annotators", "tokenize, ssplit, pos, lemma, ner, regexner")
     props.put("regexner.mapping", "jg-regexner.txt")
@@ -545,42 +549,62 @@ object analogyExtraction {
         lemma: String = token.get(classOf[LemmaAnnotation])
         regexner: String = token.get(classOf[NamedEntityTagAnnotation])
 
-      } yield (lemma, regexner)).reduceLeft((tupleFirst, tupleSecond) => {
+      } yield (lemma, regexner))
+        // make this : "(New,location) (York,location) (is,0) (great,0) (.,0)" to this: "New_York is great"
+        .reduceLeft((tupleFirst, tupleSecond) => {
         if (tupleFirst._2 == tupleSecond._2 && tupleSecond._2 != "O") {
           (tupleFirst._1 + "_" + tupleSecond._1, tupleSecond._2)
         } else {
           (" " + tupleFirst._1 + " " + tupleSecond._1, tupleSecond._2)
         }
       })._1
-      println(back)
+      println("NER & lemma: " + back)
       back
     }
 
-    val vectorDoc1: Map[String, Int] = getNER(doc1).split(" ").map(token => coOccurrences.get(token.toLowerCase())).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
-    val lengthFirstWordVector = math.floor(scala.math.sqrt(vectorDoc1.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector
+    // get the accumulated vector
 
+    def accumulatedDocumentVector(doc: String): Map[String, Int] = {
+      getNER(doc) // get the NER and lemma
+        .split(" ") // make List
+        .map(token => coOccurrences // get words which have an entry in the cooc List
+        .get(token.toLowerCase()))
+        .flatten.flatten // filter None
+        .groupBy(_._1) // ?
+        .map { case (k, v) => (k, v.map(_._2) // ?
+        .reduce((a, b) => a + b)) // sum up the count of one word
+      }
+    }
+
+    def lengthOfVector(vectorDoc: Map[String, Int]): Double = {
+      math.floor(scala.math.sqrt(vectorDoc.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector with two digit precision
+    }
+
+    var vectorDoc1: Map[String, Int] = accumulatedDocumentVector(doc1)
+    var lengthFirstWordVector: Double = lengthOfVector(vectorDoc1)
 
     while (true) {
+      print("Doc 2: ")
+      val doc2: String = scala.io.StdIn.readLine() // ask for doc 2
 
-
-      val doc2: String = scala.io.StdIn.readLine()
+      // possibility to change doc 1
+      if (doc2 == "0") {
+        print("Doc 1: ")
+        val doc1: String = scala.io.StdIn.readLine() // ask for doc 1
+        vectorDoc1 = accumulatedDocumentVector(doc1)
+        lengthFirstWordVector = lengthOfVector(vectorDoc1)
+      }
       helpMethod()
 
       def helpMethod(): Unit = {
-
-        //val vectorDoc1: Array[Map[String, Int]] = doc1.split(" ").map(token => coOccurrences.get(token) match {case Some(x) => x})
-        //val vectorDoc1: Array[(String, Int)] = doc1.split(" ").map(token => coOccurrences.get(token) match {case Some(x) => x}).flatten
-
-
-        val vectorDoc2: Map[String, Int] = getNER(doc2).split(" ").map(token => coOccurrences.get(token.toLowerCase())).flatten.flatten.groupBy(_._1).map { case (k, v) => (k, v.map(_._2).reduce((a, b) => a + b)) }
-
-
         var cosOfAngleMatrix = scala.collection.mutable.Map[String, ListMap[String, Double]]() // we can save the distances to other word vectors here
         cosOfAngleMatrix("doc1") = ListMap[String, Double]() // make a entry for the current word
 
         println("lengthFirstWordVector: " + lengthFirstWordVector)
+        val vectorDoc2: Map[String, Int] = accumulatedDocumentVector(doc2)
+        val lengthSecondWordVector = math.floor(scala.math.sqrt(math.floor(vectorDoc2.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2)) * 100) / 100) * 100) / 100 // length of second word vector
+        println("lengthSecondWordVector: " + lengthSecondWordVector)
 
-        //coOccurrences.foreach { case (secondWord, secondMap) => { // get the seconds word for comparison
         var dotProductFirstWordSecondWord: Int = 0 // initiate the dotproduct
         vectorDoc2.foreach { case (wordInSecondMap, countInSecondMap) => { // get every word in the second word
           vectorDoc1.get(wordInSecondMap) match { // and look if this words are present in the first word
@@ -592,10 +616,8 @@ object analogyExtraction {
         }
         }
         println("dotProductFirstWordSecondWord: " + dotProductFirstWordSecondWord)
-        //if (dotProductFirstWordSecondWord > 0) {
 
-        val lengthSecondWordVector = math.floor(scala.math.sqrt(math.floor(vectorDoc2.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2)) * 100) / 100) * 100) / 100 // length of second word vector
-        println("lengthSecondWordVector: " + lengthSecondWordVector)
+
         val cosOfAngleFirstWordSecondWord: Double = dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector) // cosAngle
         if (lengthSecondWordVector > 0 && lengthSecondWordVector > 0 && cosOfAngleFirstWordSecondWord > borderForCosAngle) { // filter results
           //println("firstWord: "+firstWord+"secondWord: "+secondWord)
@@ -605,8 +627,6 @@ object analogyExtraction {
         } else {
 
         }
-        //}
-        //}
 
 
         ////
@@ -649,7 +669,7 @@ object analogyExtraction {
     //allCoOccurrences
     //allDistances
     val doc1 = "car crash in New York"
-    val doc2 = "Accident in Manhattan"
+    //val doc2 = "Accident in Manhattan"
     calcDistanceOfDocs(doc1)
     client.close() // close HttpClient
   }
