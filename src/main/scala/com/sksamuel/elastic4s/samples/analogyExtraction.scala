@@ -584,12 +584,13 @@ object analogyExtraction {
     var lengthFirstWordVector: Double = lengthOfVector(vectorDoc1)
 
     while (true) {
-      print("Doc 2: ")
+      print("doc 1: " + doc1)
+      print("set doc 2: ")
       val doc2: String = scala.io.StdIn.readLine() // ask for doc 2
 
       // possibility to change doc 1
       if (doc2 == "0") {
-        print("Doc 1: ")
+        print("set doc 1: ")
         val doc1: String = scala.io.StdIn.readLine() // ask for doc 1
         vectorDoc1 = accumulatedDocumentVector(doc1)
         lengthFirstWordVector = lengthOfVector(vectorDoc1)
@@ -600,10 +601,10 @@ object analogyExtraction {
         var cosOfAngleMatrix = scala.collection.mutable.Map[String, ListMap[String, Double]]() // we can save the distances to other word vectors here
         cosOfAngleMatrix("doc1") = ListMap[String, Double]() // make a entry for the current word
 
-        println("lengthFirstWordVector: " + lengthFirstWordVector)
         val vectorDoc2: Map[String, Int] = accumulatedDocumentVector(doc2)
         val lengthSecondWordVector = math.floor(scala.math.sqrt(math.floor(vectorDoc2.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2)) * 100) / 100) * 100) / 100 // length of second word vector
-        println("lengthSecondWordVector: " + lengthSecondWordVector)
+        println("doc 1 lengthVector: " + lengthFirstWordVector)
+        println("doc 2 lengthVector: " + lengthSecondWordVector)
 
         var dotProductFirstWordSecondWord: Int = 0 // initiate the dotproduct
         vectorDoc2.foreach { case (wordInSecondMap, countInSecondMap) => { // get every word in the second word
@@ -651,7 +652,7 @@ object analogyExtraction {
 
 
       cosOfAngleMatrix("doc1") = relCosSimMatrix(cosOfAngleMatrix("doc1").filter(x => x._1 != "doc1"))*/
-        println(cosOfAngleMatrix.values)
+        println("similarity 0 to 1: " + cosOfAngleMatrix)
         cosOfAngleMatrix.empty
       }
     }
