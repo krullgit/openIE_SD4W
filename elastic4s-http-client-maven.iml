@@ -10,9 +10,16 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="Maven: com.typesafe.play:play-json_2.12:2.6.7" level="project" />
+    <orderEntry type="library" name="Maven: org.scala-lang:scala-library:2.12.2" level="project" />
+    <orderEntry type="library" name="Maven: com.typesafe.play:play-functional_2.12:2.6.7" level="project" />
+    <orderEntry type="library" name="Maven: org.scala-lang:scala-reflect:2.12.2" level="project" />
+    <orderEntry type="library" name="Maven: org.typelevel:macro-compat_2.12:1.1.1" level="project" />
+    <orderEntry type="library" name="Maven: joda-time:joda-time:2.9.9" level="project" />
+    <orderEntry type="library" name="Maven: com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.8.9" level="project" />
+    <orderEntry type="library" name="Maven: com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.8.9" level="project" />
     <orderEntry type="library" name="Maven: com.google.guava:guava:21.0-rc2" level="project" />
     <orderEntry type="library" name="Maven: com.sksamuel.elastic4s:elastic4s-http_2.12:6.1.2" level="project" />
-    <orderEntry type="library" name="Maven: org.scala-lang:scala-library:2.12.4" level="project" />
     <orderEntry type="library" name="Maven: com.sksamuel.elastic4s:elastic4s-core_2.12:6.1.2" level="project" />
     <orderEntry type="library" name="Maven: com.sksamuel.exts:exts_2.12:1.60.0" level="project" />
     <orderEntry type="library" name="Maven: com.typesafe:config:1.3.0" level="project" />
@@ -49,7 +56,6 @@
     <orderEntry type="library" name="Maven: xml-apis:xml-apis:1.3.03" level="project" />
     <orderEntry type="library" name="Maven: xerces:xercesImpl:2.8.0" level="project" />
     <orderEntry type="library" name="Maven: xalan:xalan:2.7.0" level="project" />
-    <orderEntry type="library" name="Maven: joda-time:joda-time:2.9" level="project" />
     <orderEntry type="library" name="Maven: com.googlecode.efficient-java-matrix-library:ejml:0.23" level="project" />
     <orderEntry type="library" name="Maven: org.glassfish:javax.json:1.0.4" level="project" />
     <orderEntry type="library" name="Maven: com.google.protobuf:protobuf-java:2.6.1" level="project" />
@@ -57,8 +63,6 @@
     <orderEntry type="library" name="Maven: com.sksamuel.avro4s:avro4s-core_2.12:1.8.0" level="project" />
     <orderEntry type="library" name="Maven: com.sksamuel.avro4s:avro4s-macros_2.12:1.8.0" level="project" />
     <orderEntry type="library" name="Maven: com.chuusai:shapeless_2.12:2.3.2" level="project" />
-    <orderEntry type="library" name="Maven: org.typelevel:macro-compat_2.12:1.1.1" level="project" />
-    <orderEntry type="library" name="Maven: org.scala-lang:scala-reflect:2.12.1" level="project" />
     <orderEntry type="library" name="Maven: org.apache.avro:avro:1.8.1" level="project" />
     <orderEntry type="library" name="Maven: org.codehaus.jackson:jackson-core-asl:1.9.13" level="project" />
     <orderEntry type="library" name="Maven: org.codehaus.jackson:jackson-mapper-asl:1.9.13" level="project" />

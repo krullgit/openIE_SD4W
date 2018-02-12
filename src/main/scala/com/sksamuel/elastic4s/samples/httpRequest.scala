@@ -1,8 +1,17 @@
+/*<dependency>
+  <groupId>org.scalaj</groupId>
+  <artifactId>scalaj-http_2.12</artifactId>
+  <version>2.3.0</version>
+</dependency>
+  <dependency>
+    <groupId>com.typesafe.play</groupId>
+    <artifactId>play-json_2.12</artifactId>
+    <version>2.6.7</version>
+  </dependency>
+
 package com.sksamuel.elastic4s.samples
 
-import HttpClientExampleApp._
 import scalaj.http._
-import play.api.libs.json._
 import play.api.libs.json._
 import scala.util.{Try, Success, Failure}
 
@@ -37,3 +46,4 @@ object request {
     }
   }
 }
+*/

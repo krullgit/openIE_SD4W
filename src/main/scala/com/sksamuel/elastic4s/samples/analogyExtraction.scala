@@ -20,6 +20,10 @@ import scala.collection.JavaConverters._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.concurrent.duration._
+import play.api.libs.json._
+import shapeless.PolyDefns.->
+
+import scala.util.{Failure, Success, Try}
 
 
 object analogyExtraction {
@@ -167,7 +171,7 @@ object analogyExtraction {
           return
         }
         iteratorCounter += 1
-        println("counter: " + counter)
+        println("searchhit counter: " + counter)
         counter += 1
 
         // - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -315,7 +319,7 @@ object analogyExtraction {
     // cooccurences are not affected
     // - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    val cleanedOrderedCoOccurrences2: mutable.Map[String, Map[String, Int]] = coOccurrences.filter(x => {
+    val cleanedOrderedCoOccurrences2: mutable.Map[String, Map[String, Int]] = coOccurrences.retain((_, v) => v.size > atleastCooccurence).filter(x => {
       getPOS(x._1) == "JJ" || getPOS(x._1) == "JJR" || getPOS(x._1) == "JJS" || getPOS(x._1) == "NN" || getPOS(x._1) == "NNS" || getPOS(x._1) == "NNP" || getPOS(x._1) == "NNPS" || getPOS(x._1) == "PDT" || getPOS(x._1) == "RB" || getPOS(x._1) == "RBR" || getPOS(x._1) == "RBS" || getPOS(x._1) == "RP" || getPOS(x._1) == "VB" || getPOS(x._1) == "VBD" || getPOS(x._1) == "VBG" || getPOS(x._1) == "VBN" || getPOS(x._1) == "VBP" || getPOS(x._1) == "VBZ" || getPOS(x._1) == "VBG"
     }).map(x => (x._1, x._2.toMap))
     println("size(cleanedOrderedCoOccurrences2): " + cleanedOrderedCoOccurrences2.size)
@@ -494,16 +498,15 @@ object analogyExtraction {
     //  deserialize avro file with the java api
     //  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    val coOccurrencesBuilder = ListMap.newBuilder[String, Map[String, Int]]
-    val avroOutput: File = new File("coOccurrences_big.avro")
+    val coOccurrencesBuilder = Map.newBuilder[String, Map[String, Int]]
+    val avroOutput: File = new File("coOccurrences.avro")
+    //val avroOutput: File = new File("coOccurrences_big.avro")
     try {
       val bdPersonDatumReader = new SpecificDatumReader[wordList](classOf[wordList])
       val dataFileReader = new DataFileReader[wordList](avroOutput, bdPersonDatumReader)
-      while ( {
-        dataFileReader.hasNext
-      }) {
+      while (dataFileReader.hasNext) {
         import scala.collection.JavaConversions._
-        val currentWord = dataFileReader.next
+        val currentWord: wordList = dataFileReader.next
         coOccurrencesBuilder += Tuple2(currentWord.getWord.toString, currentWord.getCooc.toMap.map(x => (x._1.toString, x._2.toInt)))
       }
     } catch {
@@ -659,21 +662,28 @@ object analogyExtraction {
 
   }
 
-  def calcDistanceOfDocsWithinElastic(doc: String): Unit = {
+  def calcDistanceOfDocsWithinElastic(doc: String,detailedPrint:Boolean)(implicit client: HttpClient): Unit = {
     val borderForCosAngle: Double = 0.0 // not important atm
     var doc1 = doc
 
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
     // get coOccurrences from avro file (takes a while)
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+
     println("READ AVRO")
     val coOccurrences: Map[String, Map[String, Int]] = readAvro()
     println("READY READ AVRO")
 
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
     // load the stanford annotator for NER tagging and lemmatisation
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+
     println("LOADING STANFORD PARSER")
     val props: Properties = new Properties() // set properties for annotator
     props.put("annotators", "tokenize, ssplit, pos, lemma, ner, regexner")
     props.put("regexner.mapping", "jg-regexner.txt")
     val pipeline: StanfordCoreNLP = new StanfordCoreNLP(props) // annotate file
+
     def getNER(sentence: String): String = { // get POS tags per sentence
       val document: Annotation = new Annotation(sentence)
       pipeline.annotate(document) // annotate
@@ -695,12 +705,14 @@ object analogyExtraction {
           (" " + tupleFirst._1 + " " + tupleSecond._1, tupleSecond._2)
         }
       })._1
-      println("NER & lemma: " + back)
+      //println("NER & lemma: " + back)
       back
     }
     println("READY LOADING STANFORD PARSER")
 
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
     // get the accumulated vector
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def accumulatedDocumentVector(doc: String): Map[String, Int] = {
       getNER(doc) // get the NER and lemma
@@ -711,92 +723,133 @@ object analogyExtraction {
       }
     }
 
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+    // get length of this vector
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+
     def lengthOfVector(vectorDoc: Map[String, Int]): Double = {
       math.floor(scala.math.sqrt(vectorDoc.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2))) * 100) / 100 // calc the length for the current word vector with two digit precision
     }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+    // calc accumulated vector and length of doc1
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
 
     var vectorDoc1: Map[String, Int] = accumulatedDocumentVector(doc1)
     var lengthFirstWordVector: Double = lengthOfVector(vectorDoc1)
 
 
-    while (true) {
-      println("")
-      println("doc 1: " + doc1)
-      print("set doc 2: ")
-      val doc2: String = scala.io.StdIn.readLine() // ask for doc 2
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+    // sentence splitter
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
 
-      // possibility to change doc 1
-      if (doc2 == "0") {
-        print("set doc 1: ")
-        doc1 = scala.io.StdIn.readLine() // ask for doc 1
-        vectorDoc1 = accumulatedDocumentVector(doc1)
-        lengthFirstWordVector = lengthOfVector(vectorDoc1)
-      }
-      helpMethod()
-
-      def helpMethod(): Unit = {
-        val cosOfAngleMatrix = scala.collection.mutable.Map[String, ListMap[String, Double]]() // we can save the distances to other word vectors here
-        cosOfAngleMatrix("doc1") = ListMap[String, Double]() // make a entry for the current word
-
-        val vectorDoc2: Map[String, Int] = accumulatedDocumentVector(doc2)
-        val lengthSecondWordVector = math.floor(scala.math.sqrt(math.floor(vectorDoc2.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2)) * 100) / 100) * 100) / 100 // length of second word vector
-        println("doc 1 # words: " + vectorDoc1.size)
-        println("doc 2 # words: " + vectorDoc2.size)
-        println("doc 1 lengthVector: " + lengthFirstWordVector)
-        println("doc 2 lengthVector: " + lengthSecondWordVector)
-
-        var dotProductFirstWordSecondWord: Int = 0 // initiate the dotproduct
-        var countWordsInBothDocuments: Int = 0
-        vectorDoc2.foreach { case (wordInSecondMap, countInSecondMap) => // get every word in the second word
-          vectorDoc1.get(wordInSecondMap) match { // and look if this words are present in the first word
-            case Some(countInFirstMap) =>
-              dotProductFirstWordSecondWord += countInFirstMap * countInSecondMap // if both words occur in both word vectors calculate the product
-              countWordsInBothDocuments += 1
-            case None => // this case is not interesting
-          }
-        }
-
-        println("doc 1 & doc 2 # words in both: " + countWordsInBothDocuments)
-        println("doc 1 & doc 2 dotProduct: " + dotProductFirstWordSecondWord)
-
-
-        val cosOfAngleFirstWordSecondWord: Double = dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector) // cosAngle
-        if (lengthSecondWordVector > 0 && lengthSecondWordVector > 0 && cosOfAngleFirstWordSecondWord > borderForCosAngle) { // filter results
-          //println("firstWord: "+firstWord+"secondWord: "+secondWord)
-          val tmp: ListMap[String, Double] = cosOfAngleMatrix("doc1").updated("doc2", (math floor cosOfAngleFirstWordSecondWord * 1000) / 1000)
-          //cosOfAngleMatrix(firstWord)(secondWord) = (math floor cosOfAngleFirstWordSecondWord * 100) / 100
-          cosOfAngleMatrix("doc1") = tmp
-          println("//dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector)")
-          println("similarity 0 to 1: " + cosOfAngleFirstWordSecondWord)
-        } else {
-
-        }
-        ////
-        // calculate the relative cosine angle DON'T DELETE ME
-        ////
-        /*
-      def relCosSimMatrix(cosOfAngleMap: Map[String, Double]): ListMap[String, Double] = {
-        //if(cosOfAngleMap.size > 0){
-        val returnValue: Map[String, Double] = (for (currentTuple <- cosOfAngleMap) yield {
-          val cosineSimCurrent: Double = cosOfAngleMap(currentTuple._1)
-          val sumCosineSimTop10: Double = cosOfAngleMap.reduce((tuple1, tuple2) => ("placeholder", tuple1._2 + tuple2._2))._2 - currentTuple._2
-          if (sumCosineSimTop10 > 0) {
-            (currentTuple._1, cosineSimCurrent / sumCosineSimTop10)
-          } else {
-            (currentTuple._1, 0.0)
-          }
-        }).filter(x => x._2 >= 0.11)
-        ListMap(returnValue.toList.sortBy {
-          _._2
-        }.reverse: _*) // return ordered soultions
-      }
-
-
-      cosOfAngleMatrix("doc1") = relCosSimMatrix(cosOfAngleMatrix("doc1").filter(x => x._1 != "doc1"))*/
-        cosOfAngleMatrix.empty
-      }
+    def ssplit(text:String): Seq[String] = {
+      //val text = Source.fromFile(filename).getLines.mkString
+      val props: Properties = new Properties()
+      props.put("annotators", "tokenize, ssplit")
+      val pipeline: StanfordCoreNLP = new StanfordCoreNLP(props)
+      val document: Annotation = new Annotation(text)
+      // run all Annotator - Tokenizer on this text
+      pipeline.annotate(document)
+      val sentences: List[CoreMap] = document.get(classOf[SentencesAnnotation]).asScala.toList
+      (for {
+        sentence: CoreMap <- sentences
+      } yield sentence).map(_.toString)
     }
 
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+    // get documents from elastic
+    // - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+    implicit val timeout: FiniteDuration = Duration(1000, "seconds")
+    //val iterator: Iterator[SearchHit] = SearchIterator.hits(client, search("test") matchAllQuery() keepAlive (keepAlive = "10m") size 100 sourceInclude List("text.string"))
+
+    val iterator: Iterator[SearchHit] = SearchIterator.hits(client, search("test") matchQuery ("nerNorm",doc1) minScore(15)  keepAlive (keepAlive = "10m") size 10 sourceInclude List("text.string","id"))
+
+
+    ///// unimportant
+
+    var countSentences = 0
+   // var countBuckets: mutable.SortedMap[Double,Int] = mutable.SortedMap(0.0->0,0.1->0,0.2->0,0.3->0,0.4->0,0.5->0,0.6->0,0.7->0,0.8->0,0.9->0,1.0->0,1.1->0,1.2->0,1.3->0,1.4->0,1.5->0,1.6->0,1.7->0,1.8->0,1.9->0,2.0->0,2.1->0)
+    var countList:mutable.ArrayBuffer[Double] = mutable.ArrayBuffer[Double]()
+    ///// unimportant end
+
+
+    iterator.foreach(searchhit => { // for each element in the iterator
+      val sentences = ssplit(List(searchhit.sourceField("text").asInstanceOf[Map[String,String]].get("string")).flatten.head.toString).toVector
+      //println(searchhit.sourceField("id"))
+      sentences.foreach(doc2 =>{
+        helpMethod()
+
+        def helpMethod(): Unit = {
+
+          val vectorDoc2: Map[String, Int] = accumulatedDocumentVector(doc2)
+          val lengthSecondWordVector = math.floor(scala.math.sqrt(math.floor(vectorDoc2.values.foldLeft(0.0)((x, y) => x + scala.math.pow(y, 2)) * 100) / 100) * 100) / 100 // length of second word vector
+
+          var dotProductFirstWordSecondWord: Int = 0 // initiate the dotproduct
+          var countWordsInBothDocuments: Int = 0
+          vectorDoc2.foreach { case (wordInSecondMap, countInSecondMap) => // get every word in the second word
+            vectorDoc1.get(wordInSecondMap) match { // and look if this words are present in the first word
+              case Some(countInFirstMap) =>
+                dotProductFirstWordSecondWord += countInFirstMap * countInSecondMap // if both words occur in both word vectors calculate the product
+                countWordsInBothDocuments += 1
+              case None => // this case is not interesting
+            }
+          }
+
+          if (lengthSecondWordVector > 0 && lengthSecondWordVector > 0) { // filter results
+            val cosOfAngleFirstWordSecondWord: Double = dotProductFirstWordSecondWord / (lengthFirstWordVector * math.pow(lengthSecondWordVector,0.7)) // cosAngle
+
+            ///// unimportant
+            //countBuckets((cosOfAngleFirstWordSecondWord*10).toInt.toDouble/10) += 1
+            countSentences += 1
+            countList.append(cosOfAngleFirstWordSecondWord)
+
+            if(countSentences % 50 == 0){
+              println("")
+              println("average: "+countList.sum/countSentences)
+              println("count: "+countSentences)
+              println("")
+              /*countBuckets.foreach(x=> {
+                print(x._1+" ")
+                val amountOfPipes = ((x._2.toDouble / countSentences.toDouble) * 200).toInt
+                0.to(amountOfPipes).foreach(_ => print ("|"))
+                println("")
+              }
+              )
+              println("count: "+countSentences)
+              println("")*/
+
+            }
+            ///// unimportant end
+
+            if(cosOfAngleFirstWordSecondWord>4 && detailedPrint){
+
+              println("doc 1: "+ doc1)
+              println("doc 2: \n" + doc2)
+              println("doc 1 # words: " + vectorDoc1.size)
+              println("doc 2 # words: " + vectorDoc2.size)
+              println("doc 1 lengthVector: " + lengthFirstWordVector)
+              println("doc 2 lengthVector: " + lengthSecondWordVector)
+              println("doc 1 & doc 2 # words in both: " + countWordsInBothDocuments)
+              println("doc 1 & doc 2 dotProduct: " + dotProductFirstWordSecondWord)
+              println("//dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector)")
+              println("similarity: " + cosOfAngleFirstWordSecondWord)
+              println("")
+            } else if(cosOfAngleFirstWordSecondWord>4){
+              println("similarity: " + cosOfAngleFirstWordSecondWord)
+              println("doc 2: \n" + doc2)
+              println("")
+            }
+
+          } else{
+
+          }
+        }
+      })
+    })
   }
 
 
@@ -807,10 +860,11 @@ object analogyExtraction {
   def main(args: Array[String]): Unit = {
     implicit val timeout: FiniteDuration = Duration(1000, "seconds") // is the timeout for the SearchIterator.hits method
     implicit val client: HttpClient = HttpClient(ElasticsearchClientUri("localhost", 9200)) // new client
-    //allCoOccurrences() // numberOfResults = 0 means unlimited
+    //allCoOccurrences(atleastCooccurence = 50) // numberOfResults = 0 means unlimited
     //allDistances
     //"Accident in Manhattan"
-    calcDistanceOfDocs("car crash in New York")
+    //calcDistanceOfDocs("car crash in New York")
+    calcDistanceOfDocsWithinElastic("car crash in New York", false)
     //allNerTyps()
     client.close() // close HttpClient
   }
