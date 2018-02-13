@@ -800,7 +800,7 @@ object analogyExtraction {
           }
 
           if (lengthSecondWordVector > 0 && lengthSecondWordVector > 0) { // filter results
-            val cosOfAngleFirstWordSecondWord: Double = dotProductFirstWordSecondWord / (lengthFirstWordVector * math.pow(lengthSecondWordVector,0.7)) // cosAngle
+            val cosOfAngleFirstWordSecondWord: Double = (dotProductFirstWordSecondWord / (lengthFirstWordVector * math.pow(lengthSecondWordVector,0.7))) / 4.924577
 
             ///// unimportant
             //countBuckets((cosOfAngleFirstWordSecondWord*10).toInt.toDouble/10) += 1
@@ -825,22 +825,23 @@ object analogyExtraction {
             }
             ///// unimportant end
 
-            if(cosOfAngleFirstWordSecondWord>4 && detailedPrint){
-
-              println("doc 1: "+ doc1)
-              println("doc 2: \n" + doc2)
-              println("doc 1 # words: " + vectorDoc1.size)
-              println("doc 2 # words: " + vectorDoc2.size)
-              println("doc 1 lengthVector: " + lengthFirstWordVector)
-              println("doc 2 lengthVector: " + lengthSecondWordVector)
-              println("doc 1 & doc 2 # words in both: " + countWordsInBothDocuments)
-              println("doc 1 & doc 2 dotProduct: " + dotProductFirstWordSecondWord)
-              println("//dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector)")
-              println("similarity: " + cosOfAngleFirstWordSecondWord)
-              println("")
-            } else if(cosOfAngleFirstWordSecondWord>4){
-              println("similarity: " + cosOfAngleFirstWordSecondWord)
-              println("doc 2: \n" + doc2)
+            if(cosOfAngleFirstWordSecondWord>0.75){
+              if (detailedPrint){
+                println("doc 1: "+ doc1)
+                println("doc 2: \n" + doc2)
+                println("doc 1 # words: " + vectorDoc1.size)
+                println("doc 2 # words: " + vectorDoc2.size)
+                println("doc 1 lengthVector: " + lengthFirstWordVector)
+                println("doc 2 lengthVector: " + lengthSecondWordVector)
+                println("doc 1 & doc 2 # words in both: " + countWordsInBothDocuments)
+                println("doc 1 & doc 2 dotProduct: " + dotProductFirstWordSecondWord)
+                println("//dotProductFirstWordSecondWord / (lengthFirstWordVector * lengthSecondWordVector)")
+                println("similarity: " + cosOfAngleFirstWordSecondWord)
+              }else{
+                println("similarity: " + cosOfAngleFirstWordSecondWord)
+                println("doc 2: \n" + doc2)
+                println("")
+              }
               println("")
             }
 
